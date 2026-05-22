@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { TextField } from '../components/Field';
 import type { ApiError } from '../api/client';
@@ -27,9 +27,19 @@ export const Login = () => {
     setBusy(true);
     setErr(null);
     try {
-      const u = await login(email, password);
+      const result = await login(email, password);
+      if ('requires_2fa' in result) {
+        nav('/login/verify', {
+          replace: true,
+          state: {
+            challenge_token: result.challenge_token,
+            email_masked: result.email_masked,
+          },
+        });
+        return;
+      }
       const from = (loc.state as { from?: string } | null)?.from;
-      nav(from && from.startsWith(HOMES[u.role]) ? from : HOMES[u.role], { replace: true });
+      nav(from && from.startsWith(HOMES[result.role]) ? from : HOMES[result.role], { replace: true });
     } catch (e2) {
       setErr((e2 as ApiError).message);
     } finally {
@@ -53,6 +63,11 @@ export const Login = () => {
         <button className="btn-primary w-full" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+        <div className="text-sm text-center">
+          <Link to="/forgot-password" className="text-brand-green-dark font-semibold hover:underline">
+            Forgot your password?
+          </Link>
+        </div>
       </form>
     </div>
   );

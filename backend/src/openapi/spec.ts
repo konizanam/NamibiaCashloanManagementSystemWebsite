@@ -182,6 +182,94 @@ export const openapiSpec = {
         responses: { '200': { description: 'Profile' }, '401': { description: 'Unauthorized' } },
       },
     },
+    '/api/auth/2fa/verify': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Verify the 6-digit code after a 2FA-protected login',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['challenge_token', 'code'],
+                properties: {
+                  challenge_token: { type: 'string' },
+                  code: { type: 'string', pattern: '^[0-9]{6}$' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Auth token + user' }, '401': { description: 'Bad / expired code' } },
+      },
+    },
+    '/api/auth/2fa/resend': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Resend the 2FA code for an in-progress login',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['challenge_token'], properties: { challenge_token: { type: 'string' } } } } },
+        },
+        responses: { '200': { description: 'Code resent' } },
+      },
+    },
+    '/api/auth/2fa/enable': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Enable two-factor authentication for the current user',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['password'], properties: { password: { type: 'string' } } } } },
+        },
+        responses: { '200': { description: 'Enabled' } },
+      },
+    },
+    '/api/auth/2fa/disable': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Disable two-factor authentication for the current user',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['password'], properties: { password: { type: 'string' } } } } },
+        },
+        responses: { '200': { description: 'Disabled' } },
+      },
+    },
+    '/api/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Request a password-reset email',
+        description: 'Always returns 200 to avoid leaking whether the email exists.',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } } } },
+        },
+        responses: { '200': { description: 'Acknowledged' } },
+      },
+    },
+    '/api/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Use a reset token to set a new password',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'new_password'],
+                properties: { token: { type: 'string' }, new_password: { type: 'string', minLength: 8 } },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Password updated' }, '401': { description: 'Invalid or expired token' } },
+      },
+    },
     '/api/auth/change-password': {
       post: {
         tags: ['Auth'],

@@ -7,6 +7,7 @@ export interface User {
   role: Role;
   status?: string;
   must_change_password?: boolean;
+  two_factor_enabled?: boolean;
 }
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'requires_info';

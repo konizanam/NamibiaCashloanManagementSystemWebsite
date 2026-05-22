@@ -50,7 +50,11 @@ export const MicrolenderLayout = () => {
       </nav>
       <div className="p-4 border-t border-white/10 text-sm">
         <div className="text-white/60 text-xs truncate">{user?.email}</div>
-        <button onClick={doLogout} className="mt-2 text-xs text-brand-amber hover:underline">Sign out</button>
+        <div className="mt-2 flex items-center gap-3 text-xs">
+          <Link to="/account/security" className="text-white/80 hover:text-white">Security</Link>
+          <span className="text-white/30">·</span>
+          <button onClick={doLogout} className="text-brand-amber hover:underline">Sign out</button>
+        </div>
       </div>
     </>
   );

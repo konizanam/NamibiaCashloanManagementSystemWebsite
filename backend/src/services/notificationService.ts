@@ -199,6 +199,57 @@ export async function sendAgentReferralSignupEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Two-factor authentication code
+// ---------------------------------------------------------------------------
+export async function sendTwoFactorCodeEmail(opts: {
+  email: string;
+  fullName: string;
+  code: string;
+  ttlMinutes: number;
+}): Promise<void> {
+  const html = wrapHtml(
+    'Your NCLMS verification code',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Sign-in verification code</h2>
+      <p>Hi ${escapeHtml(opts.fullName)},</p>
+      <p>Use this code to finish signing in to NCLMS. It expires in ${opts.ttlMinutes} minutes.</p>
+      <div style="margin:20px 0;padding:18px;background:#0f172a;color:#facc15;border-radius:10px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:28px;letter-spacing:6px;font-weight:800;">
+        ${escapeHtml(opts.code)}
+      </div>
+      <p style="color:#475569;font-size:12.5px;">If you didn't try to sign in just now, you can ignore this email — but consider changing your password.</p>
+    `,
+  );
+  await sendMail({ to: opts.email, subject: `NCLMS sign-in code: ${opts.code}`, html });
+}
+
+// ---------------------------------------------------------------------------
+// Forgot-password reset link
+// ---------------------------------------------------------------------------
+export async function sendPasswordResetEmail(opts: {
+  email: string;
+  fullName: string;
+  resetUrl: string;
+  ttlHours: number;
+}): Promise<void> {
+  const html = wrapHtml(
+    'Reset your NCLMS password',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Reset your password</h2>
+      <p>Hi ${escapeHtml(opts.fullName)},</p>
+      <p>Click below to set a new password for your NCLMS account. The link is valid for the next ${opts.ttlHours} hour${opts.ttlHours === 1 ? '' : 's'}.</p>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(opts.resetUrl)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Set a new password →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">If you didn't request this, you can ignore the email — your password won't change unless you click the link.</p>
+    `,
+  );
+  await sendMail({ to: opts.email, subject: 'Reset your NCLMS password', html });
+}
+
+// ---------------------------------------------------------------------------
 // Agent: welcome email after admin creates their account
 // ---------------------------------------------------------------------------
 export async function sendAgentWelcomeEmail(opts: {

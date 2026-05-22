@@ -23,6 +23,30 @@ export const verifyAuthToken = (token: string): JwtPayload => {
 };
 
 // ---------------------------------------------------------------------------
+// Two-factor challenge tokens — issued after a valid password login when the
+// account has 2FA enabled. The applicant must then POST the OTP back along
+// with this token to receive the real auth token.
+// ---------------------------------------------------------------------------
+
+export interface TwoFactorChallengePayload {
+  type: '2fa_challenge';
+  sub: string;
+}
+
+export const signTwoFactorChallenge = (userId: string): string =>
+  jwt.sign({ type: '2fa_challenge', sub: userId } satisfies TwoFactorChallengePayload, config.jwt.secret, {
+    expiresIn: '10m' as SignOptions['expiresIn'],
+  });
+
+export const verifyTwoFactorChallenge = (token: string): TwoFactorChallengePayload => {
+  const decoded = jwt.verify(token, config.jwt.secret);
+  if (typeof decoded === 'string') throw new Error('Invalid token');
+  const p = decoded as TwoFactorChallengePayload;
+  if (p.type !== '2fa_challenge' || !p.sub) throw new Error('Invalid 2FA challenge token');
+  return p;
+};
+
+// ---------------------------------------------------------------------------
 // Application resubmit tokens — used when an admin asks for more information.
 // The token lets the applicant edit + resubmit their application via a public
 // URL without needing an account.

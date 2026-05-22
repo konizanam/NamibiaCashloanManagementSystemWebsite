@@ -70,9 +70,11 @@ export const AdminLayout = () => {
         <div className="text-white/60 text-xs">Signed in as</div>
         <div className="font-semibold truncate">{user?.full_name}</div>
         <div className="text-white/60 text-xs truncate">{user?.email}</div>
-        <button onClick={doLogout} className="mt-3 text-xs text-brand-amber hover:underline">
-          Sign out
-        </button>
+        <div className="mt-3 flex items-center gap-3 text-xs">
+          <Link to="/account/security" className="text-white/80 hover:text-white">Security</Link>
+          <span className="text-white/30">·</span>
+          <button onClick={doLogout} className="text-brand-amber hover:underline">Sign out</button>
+        </div>
       </div>
     </>
   );

@@ -9,7 +9,11 @@ import { Apply } from './pages/Apply';
 import { ApplyEdit } from './pages/ApplyEdit';
 import { ApplySuccess } from './pages/ApplySuccess';
 import { Login } from './pages/Login';
+import { LoginVerify } from './pages/LoginVerify';
 import { ChangePassword } from './pages/ChangePassword';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
+import { AccountSecurity } from './pages/AccountSecurity';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminApplications } from './pages/admin/AdminApplications';
@@ -71,11 +75,15 @@ export default function App() {
         <Route path="/apply/edit/:token" element={<ApplyEdit />} />
         <Route path="/apply/success" element={<ApplySuccess />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/login/verify" element={<LoginVerify />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         {/* Legacy admin login URL */}
         <Route path="/admin/login" element={<Navigate to="/login" replace />} />
       </Route>
 
       <Route path="/change-password" element={<RequireAnyAuth><ChangePassword /></RequireAnyAuth>} />
+      <Route path="/account/security" element={<RequireAnyAuth><AccountSecurity /></RequireAnyAuth>} />
 
       <Route
         path="/admin"

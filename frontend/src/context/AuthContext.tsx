@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { fetchMe, login as loginApi } from '../api/auth';
+import { fetchMe, isChallenge, login as loginApi, type LoginChallenge } from '../api/auth';
 import { getToken, setToken } from '../api/client';
 import type { User } from '../api/types';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User | LoginChallenge>;
+  setSession: (token: string, user: User) => void;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -34,9 +35,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const res = await loginApi(email, password);
+    if (isChallenge(res)) {
+      // Caller (Login page) routes to /login/verify with the challenge token.
+      return res;
+    }
     setToken(res.token);
     setUser(res.user);
     return res.user;
+  };
+
+  const setSession = (token: string, u: User) => {
+    setToken(token);
+    setUser(u);
   };
 
   const logout = () => {
@@ -55,7 +65,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, setSession, logout, refresh }}>
+      {children}
+    </AuthContext.Provider>
   );
 };
 
