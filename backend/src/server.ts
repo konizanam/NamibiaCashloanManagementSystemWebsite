@@ -11,6 +11,8 @@ import { authRouter } from './routes/auth.js';
 import { applicationsRouter } from './routes/applications.js';
 import { marketingAgentsRouter } from './routes/marketingAgents.js';
 import { referralsRouter } from './routes/referrals.js';
+import { agentRouter } from './routes/agent.js';
+import { commissionsRouter } from './routes/commissions.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { openapiSpec } from './openapi/spec.js';
 
@@ -57,6 +59,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/marketing-agents', marketingAgentsRouter);
 app.use('/api/referrals', referralsRouter);
+app.use('/api/agent', agentRouter);
+app.use('/api/admin/commissions', commissionsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

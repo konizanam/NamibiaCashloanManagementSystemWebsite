@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { approveApplication, getApplication, rejectApplication } from '../../api/applications';
-import type { Application, ApplicationDocument } from '../../api/types';
+import { listApplicationMessages, postApplicationMessage } from '../../api/messages';
+import type { Application, ApplicationDocument, ApplicationMessage } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { getToken } from '../../api/client';
 
@@ -26,6 +27,7 @@ export const AdminApplicationDetail = () => {
   const nav = useNavigate();
   const [app, setApp] = useState<Application | null>(null);
   const [docs, setDocs] = useState<ApplicationDocument[]>([]);
+  const [messages, setMessages] = useState<ApplicationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -36,16 +38,49 @@ export const AdminApplicationDetail = () => {
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Message composer state
+  const [msgSubject, setMsgSubject] = useState('');
+  const [msgBody, setMsgBody] = useState('');
+  const [msgSendEmail, setMsgSendEmail] = useState(true);
+  const [msgIsInfoRequest, setMsgIsInfoRequest] = useState(false);
+  const [msgBusy, setMsgBusy] = useState(false);
+  const [msgErr, setMsgErr] = useState<string | null>(null);
+
+  const loadMessages = (appId: string) => {
+    listApplicationMessages(appId).then((r) => setMessages(r.items)).catch(() => undefined);
+  };
+
   const load = () => {
     if (!id) return;
     setLoading(true);
     getApplication(id)
-      .then((r) => { setApp(r.application); setDocs(r.documents); })
+      .then((r) => { setApp(r.application); setDocs(r.documents); loadMessages(id); })
       .catch((e) => setErr((e as Error).message))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, [id]);
+
+  const sendMessage = async () => {
+    if (!id || !msgBody.trim()) return;
+    setMsgBusy(true);
+    setMsgErr(null);
+    try {
+      await postApplicationMessage(id, {
+        subject: msgSubject.trim() || undefined,
+        body: msgBody.trim(),
+        send_email: msgSendEmail,
+        is_info_request: msgIsInfoRequest,
+      });
+      setMsgSubject(''); setMsgBody(''); setMsgIsInfoRequest(false);
+      loadMessages(id);
+      if (msgIsInfoRequest) load(); // refresh status badge
+    } catch (e) {
+      setMsgErr((e as Error).message);
+    } finally {
+      setMsgBusy(false);
+    }
+  };
 
   const doApprove = async () => {
     if (!id) return;
@@ -273,6 +308,83 @@ export const AdminApplicationDetail = () => {
           </div>
         </Modal>
       )}
+
+      {/* Messages thread */}
+      <div className="card mt-8 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-brand-navy">Communication with applicant</div>
+            <div className="text-xs text-slate-500 mt-0.5">Notes and emails sent to {app.business_email}{app.principal_officer_email !== app.business_email ? ` and ${app.principal_officer_email}` : ''}.</div>
+          </div>
+          <div className="text-xs text-slate-500">{messages.length} {messages.length === 1 ? 'entry' : 'entries'}</div>
+        </div>
+
+        <ul className="mt-5 space-y-3">
+          {messages.length === 0 && (
+            <li className="text-sm text-slate-500 italic">No messages yet.</li>
+          )}
+          {messages.map((m) => (
+            <li key={m.id} className="border-l-4 border-brand-green pl-4 py-2 bg-slate-50 rounded-r">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="text-xs text-slate-500">
+                  <span className="font-semibold text-brand-navy">{m.author_name ?? 'NCLMS'}</span>
+                  &nbsp;·&nbsp; {new Date(m.created_at).toLocaleString()}
+                  {m.email_sent && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-brand-green-dark font-semibold">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M4 6l8 7 8-7M4 6v12h16V6" />
+                      </svg>
+                      Emailed
+                    </span>
+                  )}
+                </div>
+              </div>
+              {m.subject && <div className="font-semibold text-brand-navy text-sm mt-1">{m.subject}</div>}
+              <div className="text-sm text-slate-700 whitespace-pre-wrap mt-1">{m.body}</div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <div className="font-semibold text-brand-navy mb-3">Send a note</div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              className="field-input"
+              placeholder="Subject (optional, used as email subject)"
+              value={msgSubject}
+              onChange={(e) => setMsgSubject(e.target.value)}
+            />
+            <textarea
+              className="field-input"
+              rows={4}
+              placeholder="Write your message to the applicant. They'll receive this by email (if enabled), and it'll be saved here as part of the application's audit trail."
+              value={msgBody}
+              onChange={(e) => setMsgBody(e.target.value)}
+            />
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="checkbox" checked={msgSendEmail} onChange={(e) => setMsgSendEmail(e.target.checked)} />
+                Send by email
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="checkbox" checked={msgIsInfoRequest} onChange={(e) => setMsgIsInfoRequest(e.target.checked)} />
+                Mark as "more information required"
+              </label>
+            </div>
+            {msgErr && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{msgErr}</div>}
+            <div className="flex justify-end">
+              <button
+                className="btn-primary"
+                disabled={msgBusy || msgBody.trim().length === 0}
+                onClick={sendMessage}
+              >
+                {msgBusy ? 'Sending…' : msgIsInfoRequest ? 'Send & request info' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <Link to="/admin/applications" className="mt-10 inline-block text-sm text-slate-500 hover:text-brand-navy">
         ← All applications

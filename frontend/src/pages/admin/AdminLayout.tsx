@@ -7,6 +7,7 @@ const SIDE = [
   { to: '/admin',                  label: 'Dashboard',        end: true },
   { to: '/admin/applications',     label: 'Applications' },
   { to: '/admin/marketing-agents', label: 'Marketing Agents' },
+  { to: '/admin/commissions',      label: 'Commissions' },
 ];
 
 export const AdminLayout = () => {

@@ -79,23 +79,23 @@ export const Header = () => {
             </NavLink>
           ))}
           <DemoButton />
-          {user?.role === 'admin' ? (
+          {user ? (
             <NavLink
-              to="/admin"
+              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/'}
               className={({ isActive }) =>
                 `ml-1 px-3 py-2 rounded-lg text-sm font-semibold ${
                   isActive ? 'bg-white text-brand-green-dark' : 'text-white/90 hover:bg-white/10'
                 }`
               }
             >
-              Admin
+              {user.role === 'admin' ? 'Admin' : user.role === 'marketing_agent' ? 'Agent' : 'Account'}
             </NavLink>
           ) : (
             <NavLink
-              to="/admin/login"
+              to="/login"
               className="ml-1 px-3 py-2 rounded-lg text-sm font-semibold text-white/90 hover:bg-white/10"
             >
-              Admin
+              Sign in
             </NavLink>
           )}
         </nav>
@@ -144,9 +144,9 @@ export const Header = () => {
               {item.label}
             </NavLink>
           ))}
-          {user?.role === 'admin' ? (
+          {user ? (
             <NavLink
-              to="/admin"
+              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/'}
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 `block px-3 py-3 rounded-lg text-sm font-semibold ${
@@ -154,15 +154,15 @@ export const Header = () => {
                 }`
               }
             >
-              Admin Dashboard
+              {user.role === 'admin' ? 'Admin Dashboard' : user.role === 'marketing_agent' ? 'Agent Dashboard' : 'My account'}
             </NavLink>
           ) : (
             <NavLink
-              to="/admin/login"
+              to="/login"
               onClick={() => setOpen(false)}
               className="block px-3 py-3 rounded-lg text-sm font-semibold text-white/90 hover:bg-white/10"
             >
-              Admin Sign-in
+              Sign in
             </NavLink>
           )}
           <div className="pt-3 mt-2 border-t border-white/10">

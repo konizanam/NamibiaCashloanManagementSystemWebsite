@@ -2,6 +2,14 @@ import bcrypt from 'bcryptjs';
 import { pool, withTransaction } from '../db.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import type { CreateApplicationInput } from '../schemas/application.js';
+import {
+  sendApplicationApprovedEmail,
+  sendApplicationRejectedEmail,
+  sendApplicationSubmittedEmail,
+  sendAgentReferralSignupEmail,
+  sendAgentCommissionEmail,
+} from './notificationService.js';
+import { createOnboardingCommission } from './commissionService.js';
 
 export type DocumentType =
   | 'founding_statement'
@@ -94,7 +102,7 @@ export const createApplication = async (
   const referralCode = input.referral_code ? input.referral_code.toUpperCase() : null;
   const agentId = await resolveReferralAgentId(referralCode);
 
-  return withTransaction(async (client) => {
+  const application = await withTransaction(async (client) => {
     const { rows } = await client.query<ApplicationRow>(
       `INSERT INTO nclms_microlender_applications (
          business_name, registration_number, business_type,
@@ -138,6 +146,18 @@ export const createApplication = async (
 
     return application;
   });
+
+  // Fire-and-forget notifications.
+  void sendApplicationSubmittedEmail(application).catch((e) =>
+    console.error('[email] submission email failed:', e),
+  );
+  if (agentId) {
+    void sendAgentReferralSignupEmail(agentId, application).catch((e) =>
+      console.error('[email] agent referral email failed:', e),
+    );
+  }
+
+  return application;
 };
 
 export interface ListApplicationsOpts {
@@ -209,15 +229,40 @@ export const rejectApplication = async (
             reviewed_by = $2,
             rejection_reason = $3,
             updated_at = NOW()
-      WHERE id = $1 AND status = 'pending'
+      WHERE id = $1 AND status IN ('pending','requires_info')
       RETURNING *`,
     [id, reviewedBy, reason],
   );
   if (rows.length === 0) {
-    throw conflict('Application is not in a pending state or does not exist.');
+    throw conflict('Application is not pending review or does not exist.');
+  }
+  const updated = rows[0]!;
+  void sendApplicationRejectedEmail(updated, reason).catch((e) =>
+    console.error('[email] reject email failed:', e),
+  );
+  return updated;
+};
+
+export async function setApplicationRequiresInfo(
+  id: string,
+  reviewedBy: string,
+  notes?: string,
+): Promise<ApplicationRow> {
+  const { rows } = await pool.query<ApplicationRow>(
+    `UPDATE nclms_microlender_applications
+        SET status = 'requires_info',
+            review_notes = COALESCE($3, review_notes),
+            updated_at = NOW(),
+            reviewed_by = $2
+      WHERE id = $1 AND status IN ('pending','requires_info')
+      RETURNING *`,
+    [id, reviewedBy, notes ?? null],
+  );
+  if (rows.length === 0) {
+    throw conflict('Application is not pending review or does not exist.');
   }
   return rows[0]!;
-};
+}
 
 export interface ApproveOpts {
   tier: 'tier1' | 'tier2' | 'tier3' | 'tier4';
@@ -229,14 +274,14 @@ export const approveApplication = async (
   reviewedBy: string,
   opts: ApproveOpts,
 ): Promise<{ application: ApplicationRow; userId: string; temporaryPassword: string }> => {
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const { rows: appRows } = await client.query<ApplicationRow>(
       `SELECT * FROM nclms_microlender_applications WHERE id = $1 FOR UPDATE`,
       [id],
     );
     const app = appRows[0];
     if (!app) throw notFound('Application not found');
-    if (app.status !== 'pending') {
+    if (app.status !== 'pending' && app.status !== 'requires_info') {
       throw conflict(`Application is already ${app.status}.`);
     }
 
@@ -264,12 +309,13 @@ export const approveApplication = async (
     );
     const userId = userRows[0]!.id;
 
-    await client.query(
+    const { rows: microRows } = await client.query<{ id: string }>(
       `INSERT INTO nclms_microlenders (
          user_id, business_name, registration_number, business_type,
          physical_address, city, country, phone, tier,
          referred_by_agent_id, application_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
       [
         userId,
         app.business_name,
@@ -284,6 +330,7 @@ export const approveApplication = async (
         app.id,
       ],
     );
+    const microlenderId = microRows[0]!.id;
 
     const { rows: updated } = await client.query<ApplicationRow>(
       `UPDATE nclms_microlender_applications
@@ -298,8 +345,56 @@ export const approveApplication = async (
       [id, reviewedBy, opts.notes ?? null, userId],
     );
 
-    return { application: updated[0]!, userId, temporaryPassword };
+    // Onboarding commission (if the application carried a referring agent).
+    let onboardingAmount = 0;
+    let agentInfo: { id: string; email: string; full_name: string } | null = null;
+    if (app.referred_by_agent_id) {
+      const { rows: agentRows } = await client.query<{ id: string; rate: string; email: string; full_name: string }>(
+        `SELECT a.id, a.commission_rate::text AS rate, u.email, u.full_name
+           FROM nclms_marketing_agents a
+           JOIN nclms_users u ON u.id = a.user_id
+          WHERE a.id = $1 AND a.is_active = TRUE`,
+        [app.referred_by_agent_id],
+      );
+      const agent = agentRows[0];
+      if (agent) {
+        const created = await createOnboardingCommission(client, {
+          agentId: agent.id,
+          microlenderId,
+          applicationId: app.id,
+          tier: opts.tier,
+          rate: Number(agent.rate),
+        });
+        if (created) {
+          onboardingAmount = Number(created.amount);
+          agentInfo = { id: agent.id, email: agent.email, full_name: agent.full_name };
+        }
+      }
+    }
+
+    return { application: updated[0]!, userId, temporaryPassword, agentInfo, onboardingAmount, microlenderId };
   });
+
+  // Fire-and-forget emails.
+  void sendApplicationApprovedEmail(result.application, result.temporaryPassword, opts.tier).catch((e) =>
+    console.error('[email] approval email failed:', e),
+  );
+  if (result.agentInfo && result.onboardingAmount > 0) {
+    void sendAgentCommissionEmail({
+      agentEmail: result.agentInfo.email,
+      agentName: result.agentInfo.full_name,
+      microlenderName: result.application.business_name,
+      amount: result.onboardingAmount,
+      type: 'onboarding',
+      tier: opts.tier,
+    }).catch((e) => console.error('[email] agent commission email failed:', e));
+  }
+
+  return {
+    application: result.application,
+    userId: result.userId,
+    temporaryPassword: result.temporaryPassword,
+  };
 };
 
 function generateTempPassword(): string {

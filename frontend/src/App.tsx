@@ -7,20 +7,32 @@ import { Pricing } from './pages/Pricing';
 import { Contact } from './pages/Contact';
 import { Apply } from './pages/Apply';
 import { ApplySuccess } from './pages/ApplySuccess';
-import { AdminLogin } from './pages/admin/AdminLogin';
+import { Login } from './pages/Login';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminApplications } from './pages/admin/AdminApplications';
 import { AdminApplicationDetail } from './pages/admin/AdminApplicationDetail';
 import { AdminMarketingAgents } from './pages/admin/AdminMarketingAgents';
+import { AdminCommissions } from './pages/admin/AdminCommissions';
+import { AgentLayout } from './pages/agent/AgentLayout';
+import { AgentDashboard } from './pages/agent/AgentDashboard';
+import { AgentCommissions } from './pages/agent/AgentCommissions';
+import { AgentMicrolenders } from './pages/agent/AgentMicrolenders';
+import { AgentApplications } from './pages/agent/AgentApplications';
 import { useAuth } from './context/AuthContext';
+import type { Role } from './api/types';
 import type { ReactNode } from 'react';
 import { NotFound } from './pages/NotFound';
 
-const RequireAdmin = ({ children }: { children: ReactNode }) => {
+const RequireRole = ({ role, children }: { role: Role; children: ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="p-12 text-center text-slate-500">Loading…</div>;
-  if (!user || user.role !== 'admin') return <Navigate to="/admin/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== role) {
+    // Logged in but wrong role — bounce to their own home.
+    const homes: Record<Role, string> = { admin: '/admin', marketing_agent: '/agent', microlender: '/' };
+    return <Navigate to={homes[user.role]} replace />;
+  }
   return <>{children}</>;
 };
 
@@ -35,21 +47,38 @@ export default function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/apply" element={<Apply />} />
         <Route path="/apply/success" element={<ApplySuccess />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/login" element={<Login />} />
+        {/* Legacy admin login URL */}
+        <Route path="/admin/login" element={<Navigate to="/login" replace />} />
       </Route>
 
       <Route
         path="/admin"
         element={
-          <RequireAdmin>
+          <RequireRole role="admin">
             <AdminLayout />
-          </RequireAdmin>
+          </RequireRole>
         }
       >
         <Route index element={<AdminDashboard />} />
         <Route path="applications" element={<AdminApplications />} />
         <Route path="applications/:id" element={<AdminApplicationDetail />} />
         <Route path="marketing-agents" element={<AdminMarketingAgents />} />
+        <Route path="commissions" element={<AdminCommissions />} />
+      </Route>
+
+      <Route
+        path="/agent"
+        element={
+          <RequireRole role="marketing_agent">
+            <AgentLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<AgentDashboard />} />
+        <Route path="commissions" element={<AgentCommissions />} />
+        <Route path="microlenders" element={<AgentMicrolenders />} />
+        <Route path="applications" element={<AgentApplications />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

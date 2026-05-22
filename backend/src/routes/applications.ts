@@ -10,6 +10,7 @@ import {
   listApplicationsQuerySchema,
   rejectApplicationSchema,
 } from '../schemas/application.js';
+import { messageSchema } from '../schemas/agent.js';
 import {
   approveApplication,
   createApplication,
@@ -17,9 +18,12 @@ import {
   getDocumentForDownload,
   listApplications,
   rejectApplication,
+  setApplicationRequiresInfo,
   type DocumentType,
   type UploadedDocInput,
 } from '../services/applicationService.js';
+import { createMessage, listMessages } from '../services/applicationMessageService.js';
+import { pool } from '../db.js';
 import { badRequest } from '../lib/errors.js';
 import { logAudit } from '../lib/audit.js';
 
@@ -201,6 +205,81 @@ applicationsRouter.get(
       const doc = await getDocumentForDownload(req.params.documentId!);
       const absolute = resolve(doc.file_path);
       res.download(absolute, doc.file_name);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Admin — list messages on an application
+applicationsRouter.get(
+  '/:id/messages',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res, next) => {
+    try {
+      const items = await listMessages(req.params.id!);
+      res.json({ items });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Admin — post a message to applicant (optionally email it)
+applicationsRouter.post(
+  '/:id/messages',
+  requireAuth,
+  requireRole('admin'),
+  validate(messageSchema),
+  async (req, res, next) => {
+    try {
+      const auth = (req as AuthedRequest).user!;
+      const body = req.body as {
+        subject?: string;
+        body: string;
+        send_email: boolean;
+        is_info_request: boolean;
+      };
+      const { rows } = await pool.query<{ full_name: string }>(
+        `SELECT full_name FROM nclms_users WHERE id = $1`,
+        [auth.sub],
+      );
+      const authorName = rows[0]?.full_name ?? 'NCLMS Admin';
+
+      const msg = await createMessage({
+        applicationId: req.params.id!,
+        authorUserId: auth.sub,
+        authorName,
+        subject: body.subject,
+        body: body.body,
+        sendEmail: body.send_email,
+        isInfoRequest: body.is_info_request,
+      });
+
+      // If marked as info request, also flip the application status.
+      if (body.is_info_request) {
+        await setApplicationRequiresInfo(req.params.id!, auth.sub, body.body);
+      }
+
+      res.status(201).json(msg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Admin — set status to requires_info (without sending a message)
+applicationsRouter.post(
+  '/:id/request-info',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res, next) => {
+    try {
+      const auth = (req as AuthedRequest).user!;
+      const notes = (req.body as { notes?: string })?.notes;
+      const updated = await setApplicationRequiresInfo(req.params.id!, auth.sub, notes);
+      res.json({ application: updated });
     } catch (err) {
       next(err);
     }

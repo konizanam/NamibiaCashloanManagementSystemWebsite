@@ -22,6 +22,9 @@ export const openapiSpec = {
     { name: 'Applications', description: 'Microlender signup applications' },
     { name: 'Marketing Agents', description: 'Koniza referrers and their referral codes' },
     { name: 'Referrals', description: 'Public referral-code validation' },
+    { name: 'Agent', description: 'Marketing agent self-service (commissions, referrals, dashboard)' },
+    { name: 'Admin Commissions', description: 'Admin-side commission management (list, generate monthly, mark paid)' },
+    { name: 'Application Messages', description: 'Admin notes/messages to applicants' },
   ],
   components: {
     securitySchemes: {
@@ -353,6 +356,153 @@ export const openapiSpec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: { '200': { description: 'Updated' } },
+      },
+    },
+    '/api/applications/{id}/messages': {
+      get: {
+        tags: ['Application Messages'],
+        summary: 'List messages on an application (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'List of messages' } },
+      },
+      post: {
+        tags: ['Application Messages'],
+        summary: 'Post a message to applicant; optionally email it (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['body'],
+                properties: {
+                  subject: { type: 'string' },
+                  body: { type: 'string', minLength: 1 },
+                  send_email: { type: 'boolean', default: true },
+                  is_info_request: {
+                    type: 'boolean',
+                    default: false,
+                    description: 'If true, also flips application status to requires_info.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Message created' } },
+      },
+    },
+    '/api/applications/{id}/request-info': {
+      post: {
+        tags: ['Application Messages'],
+        summary: 'Mark application as requires_info (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Status changed' } },
+      },
+    },
+    '/api/agent/me': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Current agent profile',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Profile' } },
+      },
+    },
+    '/api/agent/dashboard': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Agent dashboard stats',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Dashboard payload' } },
+      },
+    },
+    '/api/agent/commissions': {
+      get: {
+        tags: ['Agent'],
+        summary: 'List agent commissions',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending','paid','cancelled'] } },
+          { name: 'type',   in: 'query', schema: { type: 'string', enum: ['onboarding','monthly','bonus','adjustment'] } },
+          { name: 'period_month', in: 'query', schema: { type: 'string', example: '2026-05-01' } },
+          { name: 'limit',  in: 'query', schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: { '200': { description: 'Page of commissions' } },
+      },
+    },
+    '/api/agent/microlenders': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Microlenders referred by this agent',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'List' } },
+      },
+    },
+    '/api/agent/applications': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Applications submitted under this agent\'s code',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'List' } },
+      },
+    },
+    '/api/admin/commissions': {
+      get: {
+        tags: ['Admin Commissions'],
+        summary: 'List commissions across all agents (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'agent_id', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending','paid','cancelled'] } },
+          { name: 'type',   in: 'query', schema: { type: 'string', enum: ['onboarding','monthly','bonus','adjustment'] } },
+          { name: 'period_month', in: 'query', schema: { type: 'string', example: '2026-05-01' } },
+          { name: 'limit',  in: 'query', schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: { '200': { description: 'Page of commissions' } },
+      },
+    },
+    '/api/admin/commissions/generate-monthly': {
+      post: {
+        tags: ['Admin Commissions'],
+        summary: 'Generate monthly commissions for all active referred microlenders (admin)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['period_month'],
+                properties: { period_month: { type: 'string', example: '2026-05-01' } },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Generation summary' } },
+      },
+    },
+    '/api/admin/commissions/{id}/mark-paid': {
+      post: {
+        tags: ['Admin Commissions'],
+        summary: 'Mark a commission as paid (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Updated' } },
+      },
+    },
+    '/api/admin/commissions/{id}/cancel': {
+      post: {
+        tags: ['Admin Commissions'],
+        summary: 'Cancel a pending commission (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Cancelled' } },
       },
     },
     '/api/referrals/validate': {
