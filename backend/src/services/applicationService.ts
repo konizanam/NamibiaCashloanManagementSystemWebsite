@@ -352,8 +352,8 @@ export const approveApplication = async (
     let onboardingAmount = 0;
     let agentInfo: { id: string; email: string; full_name: string } | null = null;
     if (app.referred_by_agent_id) {
-      const { rows: agentRows } = await client.query<{ id: string; rate: string; email: string; full_name: string }>(
-        `SELECT a.id, a.commission_rate::text AS rate, u.email, u.full_name
+      const { rows: agentRows } = await client.query<{ id: string; email: string; full_name: string }>(
+        `SELECT a.id, u.email, u.full_name
            FROM nclms_marketing_agents a
            JOIN nclms_users u ON u.id = a.user_id
           WHERE a.id = $1 AND a.is_active = TRUE`,
@@ -366,7 +366,6 @@ export const approveApplication = async (
           microlenderId,
           applicationId: app.id,
           tier: opts.tier,
-          rate: Number(agent.rate),
         });
         if (created) {
           onboardingAmount = Number(created.amount);

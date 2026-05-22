@@ -36,7 +36,6 @@ export const AgentDashboard = () => {
           <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Your referral code</div>
           <div className="mt-1 inline-flex items-center gap-2">
             <code className="font-mono font-bold text-lg bg-slate-100 px-3 py-1 rounded-md">{agent?.referral_code ?? '—'}</code>
-            <span className="text-slate-500 text-xs">Commission: {agent ? Number(agent.commission_rate).toFixed(2) : '0.00'}%</span>
           </div>
         </div>
       </div>
@@ -67,11 +66,17 @@ export const AgentDashboard = () => {
 
       <div className="card mt-8 p-6">
         <div className="font-bold text-brand-navy">How commissions are calculated</div>
-        <ul className="mt-2 text-sm text-slate-700 space-y-1.5 leading-relaxed">
-          <li>• When a microlender you referred is <strong>approved</strong>, you earn an onboarding commission: your rate × that tier's onboarding fee.</li>
-          <li>• Each month, an admin generates monthly commissions: your rate × each active microlender's monthly fee.</li>
-          <li>• You can monitor everything from <Link to="/agent/commissions" className="text-brand-green-dark font-semibold underline-offset-2 hover:underline">Commissions →</Link></li>
+        <p className="text-sm text-slate-600 mt-1">Per the Marketing &amp; Client Acquisition Commission Agreement:</p>
+        <ul className="mt-3 text-sm text-slate-700 space-y-1.5 leading-relaxed">
+          <li>• <strong>Onboarding:</strong> 15% of the client's onboarding fee — once-off, payable when their fee is received.</li>
+          <li>• <strong>Subscription, Year 1 &amp; Year 2:</strong> 25% of monthly subscription fees received.</li>
+          <li>• <strong>Subscription, Year 3:</strong> 15% of monthly subscription fees received.</li>
+          <li>• <strong>After month 36:</strong> commission period ends — no further commission accrues, regardless of any renewals.</li>
+          <li>• Commission is calculated monthly and paid only on fees that have actually cleared into Koniza's bank account. No commission on unpaid, refunded, written-off, or cancelled fees.</li>
         </ul>
+        <p className="text-sm text-slate-600 mt-3">
+          Track every entry from <Link to="/agent/commissions" className="text-brand-green-dark font-semibold underline-offset-2 hover:underline">Commissions →</Link> and see all your referred companies under <Link to="/agent/applications" className="text-brand-green-dark font-semibold underline-offset-2 hover:underline">All Sign-ups →</Link>
+        </p>
       </div>
     </div>
   );

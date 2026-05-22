@@ -9,7 +9,7 @@ export const AdminMarketingAgents = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', commission_rate: '', notes: '' });
+  const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', notes: '' });
 
   const load = () => {
     setLoading(true);
@@ -29,11 +29,10 @@ export const AdminMarketingAgents = () => {
         email: form.email,
         phone: form.phone || undefined,
         password: form.password,
-        commission_rate: form.commission_rate ? Number(form.commission_rate) : 0,
         notes: form.notes || undefined,
       });
       setShowCreate(false);
-      setForm({ full_name: '', email: '', phone: '', password: '', commission_rate: '', notes: '' });
+      setForm({ full_name: '', email: '', phone: '', password: '', notes: '' });
       load();
     } catch (e) {
       setErr((e as Error).message);
@@ -65,22 +64,20 @@ export const AdminMarketingAgents = () => {
               <th className="px-5 py-3">Name</th>
               <th className="px-5 py-3">Email</th>
               <th className="px-5 py-3">Referral code</th>
-              <th className="px-5 py-3">Commission</th>
               <th className="px-5 py-3">Active</th>
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">Loading…</td></tr>}
+            {loading && <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">Loading…</td></tr>}
             {!loading && agents.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No marketing agents yet.</td></tr>
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No marketing agents yet.</td></tr>
             )}
             {!loading && agents.map((a) => (
               <tr key={a.id} className="border-t border-slate-100">
                 <td className="px-5 py-3 font-semibold text-brand-navy">{a.full_name}</td>
                 <td className="px-5 py-3 text-slate-600">{a.email}</td>
                 <td className="px-5 py-3"><span className="font-mono bg-slate-100 px-2 py-0.5 rounded">{a.referral_code}</span></td>
-                <td className="px-5 py-3 text-slate-600">{Number(a.commission_rate).toFixed(2)}%</td>
                 <td className="px-5 py-3">
                   {a.is_active
                     ? <span className="badge-approved">Active</span>
@@ -114,15 +111,18 @@ export const AdminMarketingAgents = () => {
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} name="email" />
               <TextField label="Phone" value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} name="phone" />
-              <TextField label="Temporary password" required type="text" value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                help="Min 8 characters. Agent should change on first sign-in." name="password" />
-              <TextField label="Commission (%)" type="number" value={form.commission_rate}
-                onChange={(e) => setForm((f) => ({ ...f, commission_rate: e.target.value }))}
-                name="commission_rate" />
+              <div className="sm:col-span-2">
+                <TextField label="Temporary password" required type="text" value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  help="Min 8 characters. Agent should change on first sign-in." name="password" />
+              </div>
               <div className="sm:col-span-2">
                 <TextAreaField label="Notes" value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} name="notes" />
+              </div>
+              <div className="sm:col-span-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                Commissions follow the standard Marketing &amp; Client Acquisition Agreement: 15% of onboarding fees,
+                25% of subscription fees in Year 1 &amp; 2, and 15% in Year 3. After month 36 no further commission accrues.
               </div>
             </div>
             {err && <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}

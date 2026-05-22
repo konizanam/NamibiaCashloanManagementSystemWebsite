@@ -4,10 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Logo } from '../../components/Logo';
 
 const SIDE = [
-  { to: '/agent',              label: 'Dashboard',   end: true },
+  { to: '/agent',              label: 'Dashboard',     end: true },
   { to: '/agent/commissions',  label: 'Commissions' },
-  { to: '/agent/microlenders', label: 'Referrals' },
-  { to: '/agent/applications', label: 'Applications' },
+  { to: '/agent/microlenders', label: 'Active Clients' },
+  { to: '/agent/applications', label: 'All Sign-ups' },
 ];
 
 export const AgentLayout = () => {

@@ -6,7 +6,7 @@ const nonEmpty = trimmed.min(1);
 export const createApplicationSchema = z.object({
   business_name: nonEmpty.max(255),
   namfisa_reg_no: nonEmpty.max(100),
-  business_type: trimmed.max(100).optional().nullable(),
+  business_type: nonEmpty.max(100),
   physical_address: trimmed.max(1000).optional().nullable(),
   city: nonEmpty.max(100),
   country: trimmed.max(100).default('Namibia'),

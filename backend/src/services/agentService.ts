@@ -1,6 +1,11 @@
 import { pool } from '../db.js';
 import { notFound } from '../lib/errors.js';
-import { TIER_FEES, commissionFromBase, type Tier } from '../lib/pricing.js';
+import {
+  TIER_FEES,
+  commissionFromBase,
+  monthlyCommissionRate,
+  type Tier,
+} from '../lib/pricing.js';
 
 export interface AgentProfile {
   id: string;
@@ -64,8 +69,8 @@ export async function getDashboardStats(agentId: string): Promise<DashboardStats
           AND period_month = date_trunc('month', NOW())::date`,
       [agentId],
     ),
-    pool.query<{ tier: string | null; rate: string | null }>(
-      `SELECT m.tier::text AS tier, a.commission_rate::text AS rate
+    pool.query<{ tier: string | null; activated_at: Date }>(
+      `SELECT m.tier::text AS tier, m.activated_at
          FROM nclms_microlenders m
          JOIN nclms_marketing_agents a ON a.id = m.referred_by_agent_id
          JOIN nclms_users u            ON u.id = m.user_id
@@ -74,10 +79,17 @@ export async function getDashboardStats(agentId: string): Promise<DashboardStats
     ),
   ]);
 
+  // Projected next month: contractual rate applied to each active microlender's
+  // tier monthly fee, depending on how many months elapsed since their subscription started.
+  const now = new Date();
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const projected = projection.rows.reduce((sum, r) => {
     const tier = r.tier as Tier | null;
     if (!tier || !(tier in TIER_FEES)) return sum;
-    const rate = Number(r.rate ?? 0);
+    const activated = new Date(r.activated_at);
+    const activatedMonth = new Date(Date.UTC(activated.getUTCFullYear(), activated.getUTCMonth(), 1));
+    const rate = monthlyCommissionRate(activatedMonth, nextMonth);
+    if (rate === 0) return sum;
     return sum + commissionFromBase(rate, TIER_FEES[tier].monthly);
   }, 0);
 

@@ -116,6 +116,7 @@ export const Apply = () => {
   const canStep1 =
     form.business_name.trim() &&
     form.namfisa_reg_no.trim() &&
+    form.business_type.trim() &&
     form.city.trim() &&
     form.country.trim() &&
     form.business_phone.trim() &&
@@ -176,7 +177,7 @@ export const Apply = () => {
               onChange={(e) => setField('namfisa_reg_no', e.target.value)} name="namfisa_reg_no"
               help="Your registration number issued by NAMFISA." />
 
-            <SelectField label="Business type" value={form.business_type}
+            <SelectField label="Business type" required value={form.business_type}
               onChange={(e) => setField('business_type', e.target.value)} name="business_type"
               options={[
                 { value: '', label: 'Select…' },

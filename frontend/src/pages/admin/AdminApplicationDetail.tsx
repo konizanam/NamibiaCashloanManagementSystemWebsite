@@ -127,20 +127,36 @@ export const AdminApplicationDetail = () => {
     }
   };
 
-  const downloadDoc = async (doc: ApplicationDocument) => {
-    if (!id) return;
+  const fetchDocBlob = async (doc: ApplicationDocument, inline: boolean): Promise<Blob | null> => {
+    if (!id) return null;
     const token = getToken();
-    const res = await fetch(`/api/applications/${id}/documents/${doc.id}`, {
+    const url = `/api/applications/${id}/documents/${doc.id}${inline ? '?inline=1' : ''}`;
+    const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    if (!res.ok) return;
-    const blob = await res.blob();
+    if (!res.ok) return null;
+    return await res.blob();
+  };
+
+  const downloadDoc = async (doc: ApplicationDocument) => {
+    const blob = await fetchDocBlob(doc, false);
+    if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = doc.file_name;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const viewDoc = async (doc: ApplicationDocument) => {
+    const blob = await fetchDocBlob(doc, true);
+    if (!blob) return;
+    const typed = doc.mime_type ? new Blob([blob], { type: doc.mime_type }) : blob;
+    const url = URL.createObjectURL(typed);
+    window.open(url, '_blank', 'noopener');
+    // Revoke after a delay so the new tab has time to load the URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   if (loading) return <div className="text-slate-500">Loading…</div>;
@@ -254,12 +270,20 @@ export const AdminApplicationDetail = () => {
                     {d.file_size ? `${(d.file_size / 1024).toFixed(1)} KB` : ''}
                   </div>
                 </div>
-                <button
-                  onClick={() => downloadDoc(d)}
-                  className="text-xs font-semibold text-brand-green-dark hover:underline whitespace-nowrap"
-                >
-                  Download
-                </button>
+                <div className="flex flex-col gap-1 items-end shrink-0">
+                  <button
+                    onClick={() => viewDoc(d)}
+                    className="text-xs font-semibold text-brand-navy hover:underline whitespace-nowrap"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => downloadDoc(d)}
+                    className="text-xs font-semibold text-brand-green-dark hover:underline whitespace-nowrap"
+                  >
+                    Download
+                  </button>
+                </div>
               </li>
             ))}
             {docs.length === 0 && <li className="text-sm text-slate-500">No documents uploaded.</li>}

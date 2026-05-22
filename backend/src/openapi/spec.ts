@@ -195,6 +195,7 @@ export const openapiSpec = {
                 required: [
                   'business_name',
                   'namfisa_reg_no',
+                  'business_type',
                   'city',
                   'business_phone',
                   'business_email',

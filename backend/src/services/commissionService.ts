@@ -1,6 +1,12 @@
 import { pool } from '../db.js';
 import type pg from 'pg';
-import { TIER_FEES, commissionFromBase, type Tier } from '../lib/pricing.js';
+import {
+  TIER_FEES,
+  ONBOARDING_COMMISSION_RATE,
+  commissionFromBase,
+  monthlyCommissionRate,
+  type Tier,
+} from '../lib/pricing.js';
 
 export interface CommissionRow {
   id: string;
@@ -26,7 +32,6 @@ export interface CreateOnboardingCommissionInput {
   microlenderId: string;
   applicationId: string;
   tier: Tier;
-  rate: number;
 }
 
 export const firstOfMonth = (d = new Date()): string => {
@@ -35,39 +40,63 @@ export const firstOfMonth = (d = new Date()): string => {
   return `${y}-${m}-01`;
 };
 
+const monthStart = (d: Date): Date =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+
+/**
+ * Onboarding commission: 15% of the tier's onboarding fee. One-off, on approval.
+ * Per the Sales Agreement (clause 5.3), this is paid once-off and is independent
+ * of the per-agent commission_rate field.
+ */
 export async function createOnboardingCommission(
   client: pg.PoolClient,
   input: CreateOnboardingCommissionInput,
 ): Promise<CommissionRow | null> {
   const base = TIER_FEES[input.tier].onboarding;
-  if (base <= 0 || input.rate <= 0) return null;
-  const amount = commissionFromBase(input.rate, base);
+  if (base <= 0) return null;
+  const rate = ONBOARDING_COMMISSION_RATE;
+  const amount = commissionFromBase(rate, base);
   const period = firstOfMonth();
   const { rows } = await client.query<CommissionRow>(
     `INSERT INTO nclms_agent_commissions
-       (agent_id, microlender_id, application_id, period_month, type, tier, rate_applied, base_amount, amount)
-     VALUES ($1, $2, $3, $4, 'onboarding', $5, $6, $7, $8)
+       (agent_id, microlender_id, application_id, period_month, type, tier, rate_applied, base_amount, amount, notes)
+     VALUES ($1, $2, $3, $4, 'onboarding', $5, $6, $7, $8, $9)
      RETURNING *`,
-    [input.agentId, input.microlenderId, input.applicationId, period, input.tier, input.rate, base, amount],
+    [
+      input.agentId,
+      input.microlenderId,
+      input.applicationId,
+      period,
+      input.tier,
+      rate,
+      base,
+      amount,
+      'Onboarding (15% of onboarding fee per Sales Agreement clause 5.3).',
+    ],
   );
   return rows[0] ?? null;
 }
 
+/**
+ * Monthly commissions: for each active referred microlender, the rate depends
+ * on how many months have elapsed since their subscription started.
+ *   Months  0–23 : 25% (Year 1 & 2)
+ *   Months 24–35 : 15% (Year 3)
+ *   Months 36+   : 0  — skipped (Commission Period exhausted)
+ */
 export async function generateMonthlyCommissions(
   period: string, // 'YYYY-MM-01'
-): Promise<{ created: number; skipped: number }> {
-  // Find all active microlenders with a referring agent, attempt to insert a monthly commission row.
-  // The unique partial index protects against duplicates for the same (microlender, month).
+): Promise<{ created: number; skipped: number; expired: number }> {
   const { rows: pairs } = await pool.query<{
     agent_id: string;
     microlender_id: string;
     tier: Tier;
-    rate: string;
+    activated_at: Date;
   }>(
     `SELECT m.referred_by_agent_id AS agent_id,
             m.id                   AS microlender_id,
             m.tier::text           AS tier,
-            a.commission_rate::text AS rate
+            m.activated_at         AS activated_at
        FROM nclms_microlenders m
        JOIN nclms_marketing_agents a ON a.id = m.referred_by_agent_id
        JOIN nclms_users u ON u.id = m.user_id
@@ -76,34 +105,39 @@ export async function generateMonthlyCommissions(
         AND u.status = 'active'`,
   );
 
+  const periodDate = new Date(`${period}T00:00:00Z`);
+
   let created = 0;
   let skipped = 0;
+  let expired = 0;
+
   for (const p of pairs) {
     const tierKey = (p.tier as Tier) in TIER_FEES ? (p.tier as Tier) : null;
-    if (!tierKey) {
-      skipped++;
-      continue;
-    }
-    const rate = Number(p.rate);
+    if (!tierKey) { skipped++; continue; }
+
+    const activated = monthStart(new Date(p.activated_at));
+    const rate = monthlyCommissionRate(activated, periodDate);
+    if (rate === 0) { expired++; continue; }
+
     const base = TIER_FEES[tierKey].monthly;
-    if (rate <= 0) { skipped++; continue; }
+    if (base <= 0) { skipped++; continue; }
     const amount = commissionFromBase(rate, base);
+
     try {
       await pool.query(
         `INSERT INTO nclms_agent_commissions
-           (agent_id, microlender_id, period_month, type, tier, rate_applied, base_amount, amount)
-         VALUES ($1, $2, $3, 'monthly', $4, $5, $6, $7)`,
-        [p.agent_id, p.microlender_id, period, tierKey, rate, base, amount],
+           (agent_id, microlender_id, period_month, type, tier, rate_applied, base_amount, amount, notes)
+         VALUES ($1, $2, $3, 'monthly', $4, $5, $6, $7, $8)`,
+        [p.agent_id, p.microlender_id, period, tierKey, rate, base, amount, `Monthly subscription commission (${rate}% per Sales Agreement clause 1.1.6).`],
       );
       created++;
     } catch (err) {
-      // Unique constraint => already exists for this microlender + month.
       const code = (err as { code?: string }).code;
       if (code === '23505') skipped++;
       else throw err;
     }
   }
-  return { created, skipped };
+  return { created, skipped, expired };
 }
 
 export async function markPaid(id: string, reference?: string | null): Promise<CommissionRow | null> {

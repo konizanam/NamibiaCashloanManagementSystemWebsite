@@ -19,6 +19,7 @@ import { AgentDashboard } from './pages/agent/AgentDashboard';
 import { AgentCommissions } from './pages/agent/AgentCommissions';
 import { AgentMicrolenders } from './pages/agent/AgentMicrolenders';
 import { AgentApplications } from './pages/agent/AgentApplications';
+import { MicrolenderPortal } from './pages/microlender/MicrolenderPortal';
 import { useAuth } from './context/AuthContext';
 import type { Role } from './api/types';
 import type { ReactNode } from 'react';
@@ -80,6 +81,15 @@ export default function App() {
         <Route path="microlenders" element={<AgentMicrolenders />} />
         <Route path="applications" element={<AgentApplications />} />
       </Route>
+
+      <Route
+        path="/portal"
+        element={
+          <RequireRole role="microlender">
+            <MicrolenderPortal />
+          </RequireRole>
+        }
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

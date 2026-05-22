@@ -200,7 +200,7 @@ applicationsRouter.post(
   },
 );
 
-// Admin — download a document
+// Admin — download or inline-view a document (?inline=1 streams it without attachment).
 applicationsRouter.get(
   '/:id/documents/:documentId',
   requireAuth,
@@ -209,7 +209,17 @@ applicationsRouter.get(
     try {
       const doc = await getDocumentForDownload(req.params.documentId!);
       const absolute = resolve(doc.file_path);
-      res.download(absolute, doc.file_name);
+      const inline = req.query.inline === '1' || req.query.inline === 'true';
+      if (inline) {
+        if (doc.mime_type) res.setHeader('Content-Type', doc.mime_type);
+        res.setHeader(
+          'Content-Disposition',
+          `inline; filename="${encodeURIComponent(doc.file_name)}"`,
+        );
+        res.sendFile(absolute);
+      } else {
+        res.download(absolute, doc.file_name);
+      }
     } catch (err) {
       next(err);
     }
