@@ -6,6 +6,7 @@ import {
   markPaidWithProof,
 } from '../../api/commissions';
 import { getToken } from '../../api/client';
+import { PromptModal } from '../../components/PromptModal';
 import type { Commission, CommissionStatus, CommissionType, Paginated } from '../../api/types';
 
 const fmtNAD = (n: number | string) =>
@@ -137,6 +138,7 @@ export const AdminCommissions = () => {
   const [genErr, setGenErr] = useState<string | null>(null);
   const [genMonth, setGenMonth] = useState(firstOfMonth());
   const [payTarget, setPayTarget] = useState<Commission | null>(null);
+  const [cancelId, setCancelId] = useState<string | null>(null);
 
   const months = useMemo(monthOptions, []);
 
@@ -168,9 +170,9 @@ export const AdminCommissions = () => {
     }
   };
 
-  const doCancel = async (id: string) => {
-    const reason = window.prompt('Cancel reason (optional)') ?? undefined;
-    await cancelCommission(id, reason || undefined);
+  const submitCancel = async (reason: string) => {
+    if (!cancelId) return;
+    await cancelCommission(cancelId, reason || undefined);
     load();
   };
 
@@ -268,7 +270,7 @@ export const AdminCommissions = () => {
                   {(c.status === 'pending' || c.status === 'payment_requested' || c.status === 'disputed') && (
                     <>
                       <button onClick={() => setPayTarget(c)} className="text-xs font-semibold text-brand-green-dark hover:underline mr-3">Mark paid</button>
-                      <button onClick={() => doCancel(c.id)} className="text-xs font-semibold text-red-600 hover:underline">Cancel</button>
+                      <button onClick={() => setCancelId(c.id)} className="text-xs font-semibold text-red-600 hover:underline">Cancel</button>
                     </>
                   )}
                 </td>
@@ -287,6 +289,19 @@ export const AdminCommissions = () => {
           onDone={() => { setPayTarget(null); load(); }}
         />
       )}
+
+      <PromptModal
+        open={cancelId !== null}
+        title="Cancel commission"
+        description="The commission is moved to Cancelled. You can record an internal note explaining why."
+        label="Reason (optional)"
+        placeholder="e.g. Microlender cancelled subscription"
+        multiline
+        confirmLabel="Cancel commission"
+        variant="danger"
+        onClose={() => setCancelId(null)}
+        onSubmit={submitCancel}
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import {
   type UpdateAdminMicrolenderInput,
 } from '../../api/adminMicrolenders';
 import { CityAutocomplete } from '../../components/CityAutocomplete';
+import { PromptModal } from '../../components/PromptModal';
 import type { AdminMicrolenderDetail as AdminMicrolenderDetailRow, Tier, UserStatus } from '../../api/types';
 
 const TIER_LABEL: Record<Tier, string> = {
@@ -37,6 +38,7 @@ export const AdminMicrolenderDetail = () => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [showSuspend, setShowSuspend] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -107,11 +109,7 @@ export const AdminMicrolenderDetail = () => {
             {ml.user_status === 'active' && (
               <button
                 className="btn-outline border-red-300 text-red-700 hover:bg-red-50"
-                onClick={async () => {
-                  if (!window.confirm(`Suspend ${ml.business_name}?`)) return;
-                  await updateAdminMicrolender(ml.id, { user_status: 'suspended' });
-                  load();
-                }}
+                onClick={() => setShowSuspend(true)}
               >
                 Suspend
               </button>
@@ -133,6 +131,20 @@ export const AdminMicrolenderDetail = () => {
 
       {okMsg && <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">{okMsg}</div>}
       {err && <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
+
+      <PromptModal
+        open={showSuspend}
+        title={`Suspend ${ml.business_name}?`}
+        description="The microlender's sign-in will be blocked until you reactivate the account. Existing applications, commissions, and documents remain in place."
+        withInput={false}
+        confirmLabel="Suspend account"
+        variant="danger"
+        onClose={() => setShowSuspend(false)}
+        onSubmit={async () => {
+          await updateAdminMicrolender(ml.id, { user_status: 'suspended' });
+          load();
+        }}
+      />
 
       {!editing ? (
         <div className="grid lg:grid-cols-2 gap-6 mt-8">

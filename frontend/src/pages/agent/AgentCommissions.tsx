@@ -6,6 +6,7 @@ import {
   requestCommissionPayment,
 } from '../../api/commissions';
 import { getToken } from '../../api/client';
+import { PromptModal } from '../../components/PromptModal';
 import type { Commission, CommissionStatus, CommissionType, Paginated } from '../../api/types';
 
 const fmtNAD = (n: number | string) =>
@@ -65,6 +66,8 @@ export const AgentCommissions = () => {
   const [type, setType] = useState<CommissionType | ''>('');
   const [period, setPeriod] = useState<string>('');
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [disputeId, setDisputeId] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   const months = useMemo(monthOptions, []);
 
@@ -101,18 +104,17 @@ export const AgentCommissions = () => {
     try { await confirmCommissionPayment(id); load(); }
     catch (e) { setActionErr((e as Error).message); }
   };
-  const doDispute = async (id: string) => {
-    const reason = window.prompt('What looks wrong? (this goes to Koniza)') ?? '';
-    if (reason.trim().length < 3) return;
-    setActionErr(null);
-    try { await disputeCommissionPayment(id, reason.trim()); load(); }
-    catch (e) { setActionErr((e as Error).message); }
+
+  const submitDispute = async (reason: string) => {
+    if (!disputeId) return;
+    await disputeCommissionPayment(disputeId, reason);
+    load();
   };
-  const doRequest = async (id: string) => {
-    const note = window.prompt('Add an optional note for Koniza (banking details, etc.)') ?? '';
-    setActionErr(null);
-    try { await requestCommissionPayment(id, note.trim() || undefined); load(); }
-    catch (e) { setActionErr((e as Error).message); }
+
+  const submitRequest = async (note: string) => {
+    if (!requestId) return;
+    await requestCommissionPayment(requestId, note || undefined);
+    load();
   };
 
   return (
@@ -202,7 +204,7 @@ export const AgentCommissions = () => {
                 </td>
                 <td className="px-5 py-3 text-right whitespace-nowrap">
                   {c.status === 'pending' && (
-                    <button onClick={() => doRequest(c.id)} className="text-xs font-semibold text-brand-amber hover:underline">
+                    <button onClick={() => setRequestId(c.id)} className="text-xs font-semibold text-brand-amber hover:underline">
                       Request payment
                     </button>
                   )}
@@ -211,7 +213,7 @@ export const AgentCommissions = () => {
                       <button onClick={() => doConfirm(c.id)} className="text-xs font-semibold text-brand-green-dark hover:underline mr-3">
                         Confirm receipt
                       </button>
-                      <button onClick={() => doDispute(c.id)} className="text-xs font-semibold text-red-600 hover:underline">
+                      <button onClick={() => setDisputeId(c.id)} className="text-xs font-semibold text-red-600 hover:underline">
                         Dispute
                       </button>
                     </>
@@ -225,6 +227,33 @@ export const AgentCommissions = () => {
       </div>
 
       {data && <div className="text-xs text-slate-500 mt-3">{data.items.length} of {data.total} shown.</div>}
+
+      <PromptModal
+        open={disputeId !== null}
+        title="Dispute this payment"
+        description="Tell Koniza what looks wrong — wrong amount, never received, anything else. Admin will be notified."
+        label="Reason"
+        placeholder="e.g. Amount is lower than expected, or payment never arrived in my account."
+        multiline
+        required
+        minLength={3}
+        confirmLabel="Submit dispute"
+        variant="danger"
+        onClose={() => setDisputeId(null)}
+        onSubmit={submitDispute}
+      />
+
+      <PromptModal
+        open={requestId !== null}
+        title="Request payment"
+        description="Asks Koniza to process this commission. You can leave a note with banking details or any context."
+        label="Note (optional)"
+        placeholder="e.g. Please use the FNB account on file."
+        multiline
+        confirmLabel="Send request"
+        onClose={() => setRequestId(null)}
+        onSubmit={submitRequest}
+      />
     </div>
   );
 };
