@@ -16,6 +16,8 @@ import { AdminApplications } from './pages/admin/AdminApplications';
 import { AdminApplicationDetail } from './pages/admin/AdminApplicationDetail';
 import { AdminMarketingAgents } from './pages/admin/AdminMarketingAgents';
 import { AdminCommissions } from './pages/admin/AdminCommissions';
+import { AdminMicrolenders } from './pages/admin/AdminMicrolenders';
+import { AdminMicrolenderDetail } from './pages/admin/AdminMicrolenderDetail';
 import { AgentLayout } from './pages/agent/AgentLayout';
 import { AgentDashboard } from './pages/agent/AgentDashboard';
 import { AgentCommissions } from './pages/agent/AgentCommissions';
@@ -88,6 +90,8 @@ export default function App() {
         <Route path="applications/:id" element={<AdminApplicationDetail />} />
         <Route path="marketing-agents" element={<AdminMarketingAgents />} />
         <Route path="commissions" element={<AdminCommissions />} />
+        <Route path="microlenders" element={<AdminMicrolenders />} />
+        <Route path="microlenders/:id" element={<AdminMicrolenderDetail />} />
       </Route>
 
       <Route

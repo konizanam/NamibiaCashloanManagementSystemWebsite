@@ -26,8 +26,13 @@ export const AdminApplications = () => {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold text-brand-navy">Applications</h1>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h1 className="text-2xl font-extrabold text-brand-navy">Applications</h1>
+          <Link to="/apply" target="_blank" rel="noopener noreferrer" className="btn-primary w-full sm:w-auto text-center">
+            + New application
+          </Link>
+        </div>
         <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
           {STATUSES.map((s) => (
             <button

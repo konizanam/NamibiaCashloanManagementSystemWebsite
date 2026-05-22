@@ -26,6 +26,7 @@ export const openapiSpec = {
     { name: 'Admin Commissions', description: 'Admin-side commission management (list, generate monthly, mark paid)' },
     { name: 'Application Messages', description: 'Admin notes/messages to applicants' },
     { name: 'Microlender', description: 'Microlender self-service' },
+    { name: 'Admin Microlenders', description: 'Admin-side CRUD for tenant microlenders' },
   ],
   components: {
     securitySchemes: {
@@ -391,6 +392,126 @@ export const openapiSpec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: { '200': { description: 'Application detail' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['Applications'],
+        summary: 'Edit an application in review (admin)',
+        description: 'Allowed while status is pending or requires_info. Returns 409 if the new NAMFISA Reg No or business email clashes with another live record.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  business_name: { type: 'string' },
+                  namfisa_reg_no: { type: 'string' },
+                  business_type: { type: 'string' },
+                  physical_address: { type: 'string' },
+                  city: { type: 'string' },
+                  country: { type: 'string' },
+                  business_phone: { type: 'string' },
+                  business_email: { type: 'string', format: 'email' },
+                  principal_officer_name: { type: 'string' },
+                  principal_officer_id_number: { type: 'string' },
+                  principal_officer_phone: { type: 'string' },
+                  principal_officer_email: { type: 'string', format: 'email' },
+                  preferred_tier: { type: 'string', enum: ['tier1', 'tier2', 'tier3', 'tier4'] },
+                  referral_code_used: { type: 'string', nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Updated' }, '409': { description: 'Conflict / not editable' } },
+      },
+    },
+    '/api/microlenders': {
+      get: {
+        tags: ['Admin Microlenders'],
+        summary: 'List microlenders (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'q',      in: 'query', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'suspended', 'pending'] } },
+          { name: 'tier',   in: 'query', schema: { type: 'string', enum: ['tier1', 'tier2', 'tier3', 'tier4'] } },
+          { name: 'limit',  in: 'query', schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: { '200': { description: 'Page of microlenders' } },
+      },
+      post: {
+        tags: ['Admin Microlenders'],
+        summary: 'Create a microlender directly (admin)',
+        description: 'Skips the application flow. Creates the user (with must_change_password=true) and the microlender record.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['business_name', 'namfisa_reg_no', 'business_type', 'city', 'business_email', 'full_name', 'password'],
+                properties: {
+                  business_name: { type: 'string' },
+                  namfisa_reg_no: { type: 'string' },
+                  business_type: { type: 'string' },
+                  physical_address: { type: 'string' },
+                  city: { type: 'string' },
+                  country: { type: 'string', default: 'Namibia' },
+                  phone: { type: 'string' },
+                  business_email: { type: 'string', format: 'email' },
+                  full_name: { type: 'string' },
+                  password: { type: 'string', minLength: 8 },
+                  tier: { type: 'string', enum: ['tier1', 'tier2', 'tier3', 'tier4'], default: 'tier1' },
+                  referred_by_agent_id: { type: 'string', format: 'uuid' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Created' }, '409': { description: 'Duplicate NAMFISA Reg No or email' } },
+      },
+    },
+    '/api/microlenders/{id}': {
+      get: {
+        tags: ['Admin Microlenders'],
+        summary: 'Microlender detail (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Microlender' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['Admin Microlenders'],
+        summary: 'Update microlender (admin)',
+        description: 'Update business + user fields, change tier, or suspend / reactivate the account by setting user_status.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  business_name: { type: 'string' },
+                  namfisa_reg_no: { type: 'string' },
+                  business_type: { type: 'string' },
+                  physical_address: { type: 'string' },
+                  city: { type: 'string' },
+                  country: { type: 'string' },
+                  phone: { type: 'string' },
+                  tier: { type: 'string', enum: ['tier1', 'tier2', 'tier3', 'tier4'] },
+                  user_status: { type: 'string', enum: ['active', 'suspended'] },
+                  full_name: { type: 'string' },
+                  email: { type: 'string', format: 'email' },
+                  referred_by_agent_id: { type: 'string', format: 'uuid' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Updated' }, '409': { description: 'Conflict' } },
       },
     },
     '/api/applications/{id}/approve': {

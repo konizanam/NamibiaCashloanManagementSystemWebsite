@@ -9,6 +9,7 @@ import {
   createApplicationSchema,
   listApplicationsQuerySchema,
   rejectApplicationSchema,
+  updateApplicationSchema,
 } from '../schemas/application.js';
 import { messageSchema } from '../schemas/agent.js';
 import {
@@ -19,8 +20,10 @@ import {
   listApplications,
   rejectApplication,
   setApplicationRequiresInfo,
+  updateApplication,
   type DocumentType,
   type UploadedDocInput,
+  type UpdateApplicationInput,
 } from '../services/applicationService.js';
 import { createMessage, listMessages } from '../services/applicationMessageService.js';
 import { pool } from '../db.js';
@@ -141,6 +144,33 @@ applicationsRouter.get('/:id', requireAuth, requireRole('admin'), async (req, re
     next(err);
   }
 });
+
+// Admin — edit application fields (while still in review).
+applicationsRouter.patch(
+  '/:id',
+  requireAuth,
+  requireRole('admin'),
+  validate(updateApplicationSchema),
+  async (req, res, next) => {
+    try {
+      const auth = (req as AuthedRequest).user!;
+      const body = req.body as UpdateApplicationInput;
+      const updated = await updateApplication(req.params.id!, body);
+      await logAudit({
+        actorId: auth.sub,
+        actorRole: auth.role,
+        action: 'application.update',
+        entityType: 'application',
+        entityId: updated.id,
+        metadata: { fields: Object.keys(body) },
+        ipAddress: req.ip,
+      });
+      res.json({ application: updated });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Admin — approve
 applicationsRouter.post(

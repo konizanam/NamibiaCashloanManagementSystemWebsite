@@ -245,6 +245,105 @@ export const getApplicationWithDocuments = async (id: string) => {
   return { application, documents: docs };
 };
 
+export interface UpdateApplicationInput {
+  business_name?: string;
+  namfisa_reg_no?: string;
+  business_type?: string;
+  physical_address?: string | null;
+  city?: string;
+  country?: string;
+  business_phone?: string;
+  business_email?: string;
+  principal_officer_name?: string;
+  principal_officer_id_number?: string;
+  principal_officer_phone?: string;
+  principal_officer_email?: string;
+  preferred_tier?: 'tier1' | 'tier2' | 'tier3' | 'tier4';
+  referral_code_used?: string | null;
+}
+
+/**
+ * Admin updates application fields. Only allowed while status ∈ pending/requires_info
+ * (approved/rejected/cancelled rows are immutable through this path).
+ */
+export async function updateApplication(
+  id: string,
+  input: UpdateApplicationInput,
+): Promise<ApplicationRow> {
+  const { rows: existing } = await pool.query<ApplicationRow>(
+    `SELECT * FROM nclms_microlender_applications WHERE id = $1`,
+    [id],
+  );
+  const current = existing[0];
+  if (!current) throw notFound('Application not found.');
+  if (current.status !== 'pending' && current.status !== 'requires_info') {
+    throw conflict(`Application is ${current.status} and can no longer be edited.`);
+  }
+
+  // Uniqueness re-check if NAMFISA reg no or business email are changing.
+  const newReg = input.namfisa_reg_no?.trim();
+  const newEmail = input.business_email?.trim().toLowerCase();
+  if (newReg && newReg !== current.namfisa_reg_no) {
+    const { rows: dup } = await pool.query<{ id: string }>(
+      `SELECT id FROM nclms_microlender_applications
+        WHERE status IN ('pending','requires_info','approved')
+          AND namfisa_reg_no = $1 AND id <> $2 LIMIT 1`,
+      [newReg, id],
+    );
+    if (dup.length > 0) throw conflict('Another live application already uses this NAMFISA Reg No.');
+    const { rows: dupMl } = await pool.query<{ id: string }>(
+      `SELECT id FROM nclms_microlenders WHERE namfisa_reg_no = $1 LIMIT 1`,
+      [newReg],
+    );
+    if (dupMl.length > 0) throw conflict('An approved microlender already uses this NAMFISA Reg No.');
+  }
+  if (newEmail && newEmail !== current.business_email.toLowerCase()) {
+    const { rows: dup } = await pool.query<{ id: string }>(
+      `SELECT id FROM nclms_microlender_applications
+        WHERE status IN ('pending','requires_info','approved')
+          AND business_email = $1 AND id <> $2 LIMIT 1`,
+      [newEmail, id],
+    );
+    if (dup.length > 0) throw conflict('Another live application already uses this business email.');
+  }
+
+  // Build dynamic UPDATE for whichever fields are present.
+  const setters: string[] = [];
+  const params: unknown[] = [];
+  const set = (col: string, val: unknown) => {
+    if (val === undefined) return;
+    params.push(val);
+    setters.push(`${col} = $${params.length}`);
+  };
+  set('business_name', input.business_name);
+  set('namfisa_reg_no', input.namfisa_reg_no);
+  set('business_type', input.business_type);
+  set('physical_address', input.physical_address);
+  set('city', input.city);
+  set('country', input.country);
+  set('business_phone', input.business_phone);
+  set('business_email', newEmail);
+  set('principal_officer_name', input.principal_officer_name);
+  set('principal_officer_id_number', input.principal_officer_id_number);
+  set('principal_officer_phone', input.principal_officer_phone);
+  set('principal_officer_email', input.principal_officer_email);
+  set('preferred_tier', input.preferred_tier);
+  set('referral_code_used', input.referral_code_used);
+
+  if (setters.length === 0) return current;
+  setters.push(`updated_at = NOW()`);
+
+  params.push(id);
+  const { rows } = await pool.query<ApplicationRow>(
+    `UPDATE nclms_microlender_applications
+        SET ${setters.join(', ')}
+      WHERE id = $${params.length}
+      RETURNING *`,
+    params,
+  );
+  return rows[0]!;
+}
+
 export const rejectApplication = async (
   id: string,
   reviewedBy: string,

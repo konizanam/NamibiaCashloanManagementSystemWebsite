@@ -33,6 +33,29 @@ export const rejectApplication = (id: string, reason: string) =>
     json: { reason },
   });
 
+export interface UpdateApplicationInput {
+  business_name?: string;
+  namfisa_reg_no?: string;
+  business_type?: string;
+  physical_address?: string | null;
+  city?: string;
+  country?: string;
+  business_phone?: string;
+  business_email?: string;
+  principal_officer_name?: string;
+  principal_officer_id_number?: string;
+  principal_officer_phone?: string;
+  principal_officer_email?: string;
+  preferred_tier?: 'tier1' | 'tier2' | 'tier3' | 'tier4';
+  referral_code_used?: string | null;
+}
+
+export const updateApplication = (id: string, body: UpdateApplicationInput) =>
+  api<{ application: Application }>(`/api/applications/${id}`, {
+    method: 'PATCH',
+    json: body,
+  });
+
 export const submitApplication = (formData: FormData) =>
   api<{ id: string; status: ApplicationStatus; submitted_at: string; message: string }>(
     '/api/applications',

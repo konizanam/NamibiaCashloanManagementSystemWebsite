@@ -6,6 +6,7 @@ import { Logo } from '../../components/Logo';
 const SIDE = [
   { to: '/admin',                  label: 'Dashboard',        end: true },
   { to: '/admin/applications',     label: 'Applications' },
+  { to: '/admin/microlenders',     label: 'Microlenders' },
   { to: '/admin/marketing-agents', label: 'Marketing Agents' },
   { to: '/admin/commissions',      label: 'Commissions' },
 ];

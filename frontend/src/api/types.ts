@@ -145,6 +145,34 @@ export interface ReferredMicrolender {
   activated_at: string;
 }
 
+export type UserStatus = 'active' | 'suspended' | 'pending';
+
+export interface AdminMicrolenderList {
+  id: string;
+  user_id: string;
+  business_name: string;
+  namfisa_reg_no: string | null;
+  business_type: string | null;
+  city: string | null;
+  country: string;
+  tier: Tier;
+  activated_at: string;
+  email: string;
+  full_name: string;
+  user_status: UserStatus;
+  agent_id: string | null;
+  agent_name: string | null;
+  agent_referral_code: string | null;
+}
+
+export interface AdminMicrolenderDetail extends AdminMicrolenderList {
+  physical_address: string | null;
+  phone: string | null;
+  application_id: string | null;
+  agent_email: string | null;
+  agent_phone: string | null;
+}
+
 export interface ReferredApplication {
   id: string;
   business_name: string;

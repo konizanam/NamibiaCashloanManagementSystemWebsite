@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { approveApplication, getApplication, rejectApplication } from '../../api/applications';
+import { approveApplication, getApplication, rejectApplication, updateApplication, type UpdateApplicationInput } from '../../api/applications';
 import { listApplicationMessages, postApplicationMessage } from '../../api/messages';
 import type { Application, ApplicationDocument, ApplicationMessage } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -40,6 +40,7 @@ export const AdminApplicationDetail = () => {
   const [busy, setBusy] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [reason, setReason] = useState('');
   const [tier, setTier] = useState<'tier1' | 'tier2' | 'tier3' | 'tier4'>('tier1');
   const [notes, setNotes] = useState('');
@@ -174,8 +175,11 @@ export const AdminApplicationDetail = () => {
             <span>Submitted {new Date(app.submitted_at).toLocaleString()}</span>
           </div>
         </div>
-        {app.status === 'pending' && (
-          <div className="flex gap-2 w-full sm:w-auto">
+        {(app.status === 'pending' || app.status === 'requires_info') && (
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <button className="btn-outline flex-1 sm:flex-none" onClick={() => setShowEdit(true)}>
+              Edit details
+            </button>
             <button className="btn-outline border-red-300 text-red-700 hover:bg-red-50 flex-1 sm:flex-none" onClick={() => setShowReject(true)}>
               Reject
             </button>
@@ -321,6 +325,14 @@ export const AdminApplicationDetail = () => {
         </Modal>
       )}
 
+      {showEdit && (
+        <EditApplicationModal
+          app={app}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => { setShowEdit(false); load(); }}
+        />
+      )}
+
       {showReject && (
         <Modal onClose={() => setShowReject(false)} title="Reject application">
           <div className="space-y-4">
@@ -428,6 +440,146 @@ export const AdminApplicationDetail = () => {
       <Link to="/admin/applications" className="mt-10 inline-block text-sm text-slate-500 hover:text-brand-navy">
         ← All applications
       </Link>
+    </div>
+  );
+};
+
+const TIER_OPTIONS: { value: 'tier1' | 'tier2' | 'tier3' | 'tier4'; label: string }[] = [
+  { value: 'tier1', label: 'Tier 1 — Starter' },
+  { value: 'tier2', label: 'Tier 2 — Growth' },
+  { value: 'tier3', label: 'Tier 3 — Professional' },
+  { value: 'tier4', label: 'Tier 4 — Enterprise' },
+];
+
+const EditApplicationModal = ({
+  app,
+  onClose,
+  onSaved,
+}: {
+  app: Application;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const [form, setForm] = useState<UpdateApplicationInput>({
+    business_name: app.business_name,
+    namfisa_reg_no: app.namfisa_reg_no ?? '',
+    business_type: app.business_type ?? '',
+    physical_address: app.physical_address,
+    city: app.city ?? '',
+    country: app.country,
+    business_phone: app.business_phone ?? '',
+    business_email: app.business_email,
+    principal_officer_name: app.principal_officer_name,
+    principal_officer_id_number: app.principal_officer_id_number,
+    principal_officer_phone: app.principal_officer_phone,
+    principal_officer_email: app.principal_officer_email,
+    preferred_tier: (app.preferred_tier ?? undefined) as 'tier1' | 'tier2' | 'tier3' | 'tier4' | undefined,
+    referral_code_used: app.referral_code_used ?? '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const setField = <K extends keyof UpdateApplicationInput>(k: K, v: UpdateApplicationInput[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateApplication(app.id, form);
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 my-8" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-brand-navy text-lg">Edit application</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">✕</button>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="field-label">Business name</label>
+            <input className="field-input" value={form.business_name ?? ''} onChange={(e) => setField('business_name', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">NAMFISA Reg No</label>
+            <input className="field-input" value={form.namfisa_reg_no ?? ''} onChange={(e) => setField('namfisa_reg_no', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Business type</label>
+            <input className="field-input" value={form.business_type ?? ''} onChange={(e) => setField('business_type', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">City</label>
+            <input className="field-input" value={form.city ?? ''} onChange={(e) => setField('city', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Country</label>
+            <input className="field-input" value={form.country ?? ''} onChange={(e) => setField('country', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Business number</label>
+            <input className="field-input" value={form.business_phone ?? ''} onChange={(e) => setField('business_phone', e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label">Business email</label>
+            <input type="email" className="field-input" value={form.business_email ?? ''} onChange={(e) => setField('business_email', e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label">Physical address</label>
+            <textarea className="field-input" rows={2} value={form.physical_address ?? ''} onChange={(e) => setField('physical_address', e.target.value)} />
+          </div>
+
+          <div className="sm:col-span-2 border-t border-slate-100 pt-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2">Principal officer</div>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label">Full name</label>
+            <input className="field-input" value={form.principal_officer_name ?? ''} onChange={(e) => setField('principal_officer_name', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">ID number</label>
+            <input className="field-input" value={form.principal_officer_id_number ?? ''} onChange={(e) => setField('principal_officer_id_number', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Phone</label>
+            <input className="field-input" value={form.principal_officer_phone ?? ''} onChange={(e) => setField('principal_officer_phone', e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label">Email</label>
+            <input type="email" className="field-input" value={form.principal_officer_email ?? ''} onChange={(e) => setField('principal_officer_email', e.target.value)} />
+          </div>
+
+          <div className="sm:col-span-2 border-t border-slate-100 pt-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2">Plan &amp; referral</div>
+          </div>
+          <div>
+            <label className="field-label">Preferred tier</label>
+            <select className="field-input" value={form.preferred_tier ?? ''} onChange={(e) => setField('preferred_tier', e.target.value as typeof form.preferred_tier)}>
+              <option value="">—</option>
+              {TIER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Referral code</label>
+            <input className="field-input" value={form.referral_code_used ?? ''} onChange={(e) => setField('referral_code_used', e.target.value.toUpperCase())} />
+          </div>
+        </div>
+
+        {err && <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn-outline" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn-primary" onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+        </div>
+      </div>
     </div>
   );
 };
