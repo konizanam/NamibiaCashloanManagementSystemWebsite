@@ -1,0 +1,15 @@
+# Railway build + deploy for the NCLMS backend.
+# Set the service's Root Directory to "backend" in Railway → Settings → Source
+# so Nixpacks discovers this file and the package.json correctly.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+# Apply pending migrations, then start the API.
+startCommand = "node dist/migrate.js && node dist/server.js"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
