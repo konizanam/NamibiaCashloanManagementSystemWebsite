@@ -34,6 +34,8 @@ const DOCUMENT_FIELDS: { name: string; type: DocumentType; maxCount: number }[] 
   { name: 'namfisa_certificate', type: 'namfisa_certificate', maxCount: 1 },
   { name: 'namfisa_approval_letter', type: 'namfisa_approval_letter', maxCount: 1 },
   { name: 'principal_officer_id', type: 'principal_officer_id', maxCount: 1 },
+  { name: 'business_registration', type: 'business_registration', maxCount: 10 },
+  // Kept for backwards compatibility with older client builds.
   { name: 'member_ids', type: 'member_id', maxCount: 10 },
 ];
 
@@ -70,10 +72,13 @@ applicationsRouter.post(
           (d) => d.documentType === 'namfisa_certificate' || d.documentType === 'namfisa_approval_letter',
         )
       ) {
-        throw badRequest('Either a NAMFISA certificate or NAMFISA approval letter is required.');
+        throw badRequest('A NAMFISA certificate or approval letter is required.');
       }
       if (!documents.some((d) => d.documentType === 'principal_officer_id')) {
         throw badRequest('Principal officer ID is required.');
+      }
+      if (!documents.some((d) => d.documentType === 'business_registration')) {
+        throw badRequest('Business registration documents (Close Corp / Company) are required.');
       }
 
       const application = await createApplication(parsed, documents);

@@ -16,6 +16,7 @@ export type DocumentType =
   | 'namfisa_certificate'
   | 'namfisa_approval_letter'
   | 'principal_officer_id'
+  | 'business_registration'
   | 'member_id'
   | 'other';
 
@@ -30,7 +31,8 @@ export interface UploadedDocInput {
 export interface ApplicationRow {
   id: string;
   business_name: string;
-  registration_number: string | null;
+  namfisa_reg_no: string | null;
+  preferred_tier: 'tier1' | 'tier2' | 'tier3' | 'tier4' | null;
   business_type: string | null;
   physical_address: string | null;
   city: string | null;
@@ -105,29 +107,30 @@ export const createApplication = async (
   const application = await withTransaction(async (client) => {
     const { rows } = await client.query<ApplicationRow>(
       `INSERT INTO nclms_microlender_applications (
-         business_name, registration_number, business_type,
+         business_name, namfisa_reg_no, business_type,
          physical_address, city, country, business_phone, business_email,
          principal_officer_name, principal_officer_id_number,
          principal_officer_phone, principal_officer_email,
-         referral_code_used, referred_by_agent_id
+         preferred_tier, referral_code_used, referred_by_agent_id
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8,
-         $9, $10, $11, $12, $13, $14
+         $9, $10, $11, $12, $13, $14, $15
        )
        RETURNING *`,
       [
         input.business_name,
-        input.registration_number ?? null,
+        input.namfisa_reg_no,
         input.business_type ?? null,
         input.physical_address ?? null,
-        input.city ?? null,
+        input.city,
         input.country,
-        input.business_phone ?? null,
+        input.business_phone,
         input.business_email,
         input.principal_officer_name,
         input.principal_officer_id_number,
         input.principal_officer_phone,
         input.principal_officer_email,
+        input.preferred_tier,
         referralCode,
         agentId,
       ],
@@ -311,7 +314,7 @@ export const approveApplication = async (
 
     const { rows: microRows } = await client.query<{ id: string }>(
       `INSERT INTO nclms_microlenders (
-         user_id, business_name, registration_number, business_type,
+         user_id, business_name, namfisa_reg_no, business_type,
          physical_address, city, country, phone, tier,
          referred_by_agent_id, application_id
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -319,7 +322,7 @@ export const approveApplication = async (
       [
         userId,
         app.business_name,
-        app.registration_number,
+        app.namfisa_reg_no,
         app.business_type,
         app.physical_address,
         app.city,

@@ -13,7 +13,8 @@ export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'requires_
 export interface Application {
   id: string;
   business_name: string;
-  registration_number: string | null;
+  namfisa_reg_no: string | null;
+  preferred_tier: Tier | null;
   business_type: string | null;
   physical_address: string | null;
   city: string | null;
@@ -40,6 +41,7 @@ export type DocumentType =
   | 'namfisa_certificate'
   | 'namfisa_approval_letter'
   | 'principal_officer_id'
+  | 'business_registration'
   | 'member_id'
   | 'other';
 

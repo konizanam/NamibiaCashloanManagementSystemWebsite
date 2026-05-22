@@ -11,8 +11,16 @@ const docLabel: Record<string, string> = {
   namfisa_certificate:     'NAMFISA certificate',
   namfisa_approval_letter: 'NAMFISA approval letter',
   principal_officer_id:    'Principal officer ID',
+  business_registration:   'Business registration (CC / Company)',
   member_id:               'Member / director ID',
   other:                   'Other document',
+};
+
+const TIER_LABEL: Record<string, string> = {
+  tier1: 'Tier 1 — Starter',
+  tier2: 'Tier 2 — Growth',
+  tier3: 'Tier 3 — Professional',
+  tier4: 'Tier 4 — Enterprise',
 };
 
 const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -54,7 +62,12 @@ export const AdminApplicationDetail = () => {
     if (!id) return;
     setLoading(true);
     getApplication(id)
-      .then((r) => { setApp(r.application); setDocs(r.documents); loadMessages(id); })
+      .then((r) => {
+        setApp(r.application);
+        setDocs(r.documents);
+        if (r.application.preferred_tier) setTier(r.application.preferred_tier);
+        loadMessages(id);
+      })
       .catch((e) => setErr((e as Error).message))
       .finally(() => setLoading(false));
   };
@@ -177,12 +190,14 @@ export const AdminApplicationDetail = () => {
         <div className="card p-6 lg:col-span-2">
           <div className="font-bold text-brand-navy">Business details</div>
           <div className="grid sm:grid-cols-2 gap-5 mt-4">
-            <Row label="Registration number" value={app.registration_number} />
-            <Row label="Business type"       value={app.business_type} />
-            <Row label="City"                value={app.city} />
-            <Row label="Country"             value={app.country} />
-            <Row label="Business phone"      value={app.business_phone} />
-            <Row label="Business email"      value={app.business_email} />
+            <Row label="NAMFISA Reg No" value={app.namfisa_reg_no} />
+            <Row label="Business type"   value={app.business_type} />
+            <Row label="City"            value={app.city} />
+            <Row label="Country"         value={app.country} />
+            <Row label="Business number" value={app.business_phone} />
+            <Row label="Business email"  value={app.business_email} />
+            <Row label="Selected plan"
+                 value={app.preferred_tier ? TIER_LABEL[app.preferred_tier] ?? app.preferred_tier : null} />
             <div className="sm:col-span-2">
               <Row label="Physical address" value={app.physical_address} />
             </div>
