@@ -104,6 +104,31 @@ export const createApplication = async (
   const referralCode = input.referral_code ? input.referral_code.toUpperCase() : null;
   const agentId = await resolveReferralAgentId(referralCode);
 
+  // Uniqueness: reject if NAMFISA reg no or business email already has a live
+  // application (pending / requires_info / approved) or an approved microlender.
+  const { rows: dupApp } = await pool.query<{ id: string; status: string; field: string }>(
+    `SELECT id, status,
+            CASE
+              WHEN namfisa_reg_no = $1 THEN 'NAMFISA Reg No'
+              WHEN business_email = $2 THEN 'business email'
+            END AS field
+       FROM nclms_microlender_applications
+      WHERE status IN ('pending','requires_info','approved')
+        AND (namfisa_reg_no = $1 OR business_email = LOWER($2))
+      LIMIT 1`,
+    [input.namfisa_reg_no, input.business_email],
+  );
+  if (dupApp.length > 0) {
+    throw conflict(`An application with this ${dupApp[0]!.field} is already on file (status: ${dupApp[0]!.status}).`);
+  }
+  const { rows: dupMl } = await pool.query<{ id: string }>(
+    `SELECT id FROM nclms_microlenders WHERE namfisa_reg_no = $1 LIMIT 1`,
+    [input.namfisa_reg_no],
+  );
+  if (dupMl.length > 0) {
+    throw conflict('A microlender with this NAMFISA Reg No is already registered.');
+  }
+
   const application = await withTransaction(async (client) => {
     const { rows } = await client.query<ApplicationRow>(
       `INSERT INTO nclms_microlender_applications (
@@ -300,8 +325,8 @@ export const approveApplication = async (
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
     const { rows: userRows } = await client.query<{ id: string }>(
-      `INSERT INTO nclms_users (email, password_hash, full_name, phone, role, status)
-       VALUES ($1, $2, $3, $4, 'microlender', 'active')
+      `INSERT INTO nclms_users (email, password_hash, full_name, phone, role, status, must_change_password)
+       VALUES ($1, $2, $3, $4, 'microlender', 'active', TRUE)
        RETURNING id`,
       [
         app.business_email,

@@ -199,6 +199,221 @@ export async function sendAgentReferralSignupEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Agent: welcome email after admin creates their account
+// ---------------------------------------------------------------------------
+export async function sendAgentWelcomeEmail(opts: {
+  email: string;
+  fullName: string;
+  temporaryPassword: string;
+  referralCode: string;
+}): Promise<void> {
+  const loginUrl = `${PUBLIC_URL}/login`;
+  const html = wrapHtml(
+    'Welcome to NCLMS',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;color:#15803d;">Welcome aboard</h2>
+      <p>Hi ${escapeHtml(opts.fullName)},</p>
+      <p>Your NCLMS marketing-agent account is ready. You'll use this account to refer microlenders, track commissions, and request payments.</p>
+
+      <table cellpadding="0" cellspacing="0" style="margin:16px 0;border:1px solid #e2e8f0;border-radius:8px;width:100%;font-size:13px;">
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;width:160px;">Sign-in email</td>
+            <td style="padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(opts.email)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Temporary password</td>
+            <td style="padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#fef9c3;">${escapeHtml(opts.temporaryPassword)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Your referral code</td>
+            <td style="padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:#15803d;">${escapeHtml(opts.referralCode)}</td></tr>
+      </table>
+
+      <p><strong>On your first sign-in</strong>, you'll be asked to change your password.</p>
+
+      <p style="margin:8px 0 4px;font-weight:600;color:#0f172a;">Your commission structure</p>
+      <ul style="margin:0 0 14px 18px;padding:0;font-size:13.5px;color:#334155;">
+        <li>15% of onboarding fees, once-off, when the client pays the onboarding fee.</li>
+        <li>25% of subscription fees in Year 1 and Year 2.</li>
+        <li>15% of subscription fees in Year 3.</li>
+        <li>After month 36 the commission period ends.</li>
+      </ul>
+
+      <p>Share your referral code with the microlenders you onboard. They enter it on the Apply form and you'll be credited automatically.</p>
+
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(loginUrl)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Sign in to your dashboard →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">If anything looks off, just reply to this email and we'll sort it out.</p>
+    `,
+  );
+  await sendMail({ to: opts.email, subject: 'Welcome to NCLMS — your agent account is ready', html });
+}
+
+// ---------------------------------------------------------------------------
+// Payment workflow emails
+// ---------------------------------------------------------------------------
+export async function sendAgentPaymentMarkedEmail(opts: {
+  agentEmail: string;
+  agentName: string;
+  microlenderName: string;
+  amount: number;
+  reference?: string;
+  periodMonth: string;
+  hasProof: boolean;
+}): Promise<void> {
+  const dashUrl = `${PUBLIC_URL}/agent/commissions`;
+  const html = wrapHtml(
+    'Payment received — please confirm',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Confirm payment received</h2>
+      <p>Hi ${escapeHtml(opts.agentName)},</p>
+      <p>Koniza has marked a commission as paid and is awaiting your confirmation:</p>
+      <table cellpadding="0" cellspacing="0" style="margin:14px 0;border:1px solid #e2e8f0;border-radius:8px;width:100%;font-size:13px;">
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;width:160px;">Microlender</td>
+            <td style="padding:10px 14px;">${escapeHtml(opts.microlenderName)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Period</td>
+            <td style="padding:10px 14px;">${escapeHtml(opts.periodMonth)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Amount</td>
+            <td style="padding:10px 14px;font-weight:700;color:#15803d;">N$ ${opts.amount.toFixed(2)}</td></tr>
+        ${opts.reference ? `<tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Reference</td><td style="padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(opts.reference)}</td></tr>` : ''}
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Proof attached</td>
+            <td style="padding:10px 14px;">${opts.hasProof ? 'Yes — view from your dashboard.' : 'No proof uploaded.'}</td></tr>
+      </table>
+      <p>Open your dashboard, review the proof of payment, then confirm you've received the funds in your account. If something looks off, you can also dispute the entry from the same screen.</p>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(dashUrl)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Confirm or dispute →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">We'll send you periodic reminders until you confirm.</p>
+    `,
+  );
+  await sendMail({ to: opts.agentEmail, subject: `Payment received — confirm receipt (${opts.microlenderName})`, html });
+}
+
+export async function sendAdminPaymentRequestEmail(opts: {
+  adminRecipients: string[];
+  agentName: string;
+  microlenderName: string;
+  amount: number;
+  periodMonth: string;
+  message?: string;
+}): Promise<void> {
+  if (opts.adminRecipients.length === 0) return;
+  const url = `${PUBLIC_URL}/admin/commissions`;
+  const html = wrapHtml(
+    'Commission payment request',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Payment requested by ${escapeHtml(opts.agentName)}</h2>
+      <p>An agent has formally requested payment for a commission. Please action.</p>
+      <table cellpadding="0" cellspacing="0" style="margin:14px 0;border:1px solid #e2e8f0;border-radius:8px;width:100%;font-size:13px;">
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;width:160px;">Agent</td>
+            <td style="padding:10px 14px;">${escapeHtml(opts.agentName)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Microlender</td>
+            <td style="padding:10px 14px;">${escapeHtml(opts.microlenderName)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Period</td>
+            <td style="padding:10px 14px;">${escapeHtml(opts.periodMonth)}</td></tr>
+        <tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Amount</td>
+            <td style="padding:10px 14px;font-weight:700;color:#15803d;">N$ ${opts.amount.toFixed(2)}</td></tr>
+        ${opts.message ? `<tr><td style="background:#f8fafc;padding:10px 14px;font-weight:600;color:#475569;">Note from agent</td><td style="padding:10px 14px;">${escapeHtml(opts.message)}</td></tr>` : ''}
+      </table>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(url)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Open Admin Commissions →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">Reminders will repeat until this request is paid or cancelled.</p>
+    `,
+  );
+  await sendMail({ to: opts.adminRecipients.join(', '), subject: `Payment requested — ${opts.microlenderName} (${opts.periodMonth})`, html });
+}
+
+export async function sendAdminAgentConfirmationEmail(opts: {
+  adminRecipients: string[];
+  agentName: string;
+  microlenderName: string;
+  amount: number;
+  confirmed: boolean;
+  disputeReason?: string;
+}): Promise<void> {
+  if (opts.adminRecipients.length === 0) return;
+  const url = `${PUBLIC_URL}/admin/commissions`;
+  const verb = opts.confirmed ? 'confirmed receipt of' : 'disputed';
+  const headline = opts.confirmed ? 'Payment confirmed by agent' : 'Payment disputed by agent';
+  const colour = opts.confirmed ? '#15803d' : '#b91c1c';
+  const html = wrapHtml(
+    headline,
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;color:${colour};">${headline}</h2>
+      <p><strong>${escapeHtml(opts.agentName)}</strong> ${verb} the commission payment for <strong>${escapeHtml(opts.microlenderName)}</strong> (N$ ${opts.amount.toFixed(2)}).</p>
+      ${opts.disputeReason ? `<div style="margin:14px 0;padding:14px 16px;background:#fef2f2;border-left:3px solid #ef4444;border-radius:4px;font-size:13.5px;"><strong>Reason:</strong><br/>${paragraphsToHtml(opts.disputeReason)}</div>` : ''}
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(url)}"
+           style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Open Admin Commissions →
+        </a>
+      </p>
+    `,
+  );
+  await sendMail({ to: opts.adminRecipients.join(', '), subject: `${headline} — ${opts.microlenderName}`, html });
+}
+
+// ---------------------------------------------------------------------------
+// Reminder emails
+// ---------------------------------------------------------------------------
+export async function sendAgentConfirmReminderEmail(opts: {
+  agentEmail: string;
+  agentName: string;
+  microlenderName: string;
+  amount: number;
+  daysWaiting: number;
+}): Promise<void> {
+  const url = `${PUBLIC_URL}/agent/commissions`;
+  const html = wrapHtml(
+    'Reminder: please confirm your commission payment',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Reminder — payment awaiting your confirmation</h2>
+      <p>Hi ${escapeHtml(opts.agentName)},</p>
+      <p>It's been ${opts.daysWaiting} day${opts.daysWaiting === 1 ? '' : 's'} since Koniza marked your commission for <strong>${escapeHtml(opts.microlenderName)}</strong> (N$ ${opts.amount.toFixed(2)}) as paid. Please open the dashboard, verify receipt against the attached proof, and confirm — or dispute it if anything looks off.</p>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(url)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Open my dashboard →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">We'll keep nudging until this is resolved.</p>
+    `,
+  );
+  await sendMail({ to: opts.agentEmail, subject: `Reminder — confirm commission payment (${opts.microlenderName})`, html });
+}
+
+export async function sendAdminPaymentRequestReminderEmail(opts: {
+  adminRecipients: string[];
+  agentName: string;
+  microlenderName: string;
+  amount: number;
+  daysWaiting: number;
+}): Promise<void> {
+  if (opts.adminRecipients.length === 0) return;
+  const url = `${PUBLIC_URL}/admin/commissions`;
+  const html = wrapHtml(
+    'Reminder: outstanding agent payment request',
+    `
+      <h2 style="margin:0 0 12px;font-size:20px;">Reminder — outstanding payment request</h2>
+      <p>${escapeHtml(opts.agentName)} requested payment for <strong>${escapeHtml(opts.microlenderName)}</strong> (N$ ${opts.amount.toFixed(2)}) ${opts.daysWaiting} day${opts.daysWaiting === 1 ? '' : 's'} ago. The request is still pending.</p>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(url)}"
+           style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Pay or update →
+        </a>
+      </p>
+    `,
+  );
+  await sendMail({ to: opts.adminRecipients.join(', '), subject: `Reminder — agent payment request (${opts.microlenderName})`, html });
+}
+
+// ---------------------------------------------------------------------------
 // Agent: commission earned (used on approval)
 // ---------------------------------------------------------------------------
 export async function sendAgentCommissionEmail(opts: {

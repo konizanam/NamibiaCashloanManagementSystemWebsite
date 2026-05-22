@@ -25,6 +25,7 @@ export const openapiSpec = {
     { name: 'Agent', description: 'Marketing agent self-service (commissions, referrals, dashboard)' },
     { name: 'Admin Commissions', description: 'Admin-side commission management (list, generate monthly, mark paid)' },
     { name: 'Application Messages', description: 'Admin notes/messages to applicants' },
+    { name: 'Microlender', description: 'Microlender self-service' },
   ],
   components: {
     securitySchemes: {
@@ -178,6 +179,135 @@ export const openapiSpec = {
         summary: 'Current user profile',
         security: [{ bearerAuth: [] }],
         responses: { '200': { description: 'Profile' }, '401': { description: 'Unauthorized' } },
+      },
+    },
+    '/api/auth/change-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Change the current user\'s password (clears must_change_password)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['current_password', 'new_password'],
+                properties: {
+                  current_password: { type: 'string' },
+                  new_password: { type: 'string', minLength: 8 },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Password changed' }, '401': { description: 'Wrong current password' } },
+      },
+    },
+    '/api/microlender/me': {
+      get: {
+        tags: ['Microlender'],
+        summary: 'Current microlender profile',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Profile' }, '404': { description: 'No microlender record for this user' } },
+      },
+    },
+    '/api/microlender/dashboard': {
+      get: {
+        tags: ['Microlender'],
+        summary: 'Microlender dashboard (profile + recent application messages)',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Dashboard payload' } },
+      },
+    },
+    '/api/admin/commissions/{id}/mark-paid': {
+      post: {
+        tags: ['Admin Commissions'],
+        summary: 'Mark commission as paid; status moves to awaiting_agent_confirmation (admin)',
+        description:
+          'Multipart form. Optional fields: `reference` (text) and `proof` (file). On success the agent receives an email asking them to confirm receipt.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                properties: {
+                  reference: { type: 'string' },
+                  proof: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Updated' } },
+      },
+    },
+    '/api/admin/commissions/{id}/proof': {
+      get: {
+        tags: ['Admin Commissions'],
+        summary: 'Download / view proof of payment (admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'inline', in: 'query', schema: { type: 'string', enum: ['1', 'true'] } },
+        ],
+        responses: { '200': { description: 'File' } },
+      },
+    },
+    '/api/agent/commissions/{id}/confirm': {
+      post: {
+        tags: ['Agent'],
+        summary: 'Confirm receipt of a payment (agent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Confirmed; status → paid' } },
+      },
+    },
+    '/api/agent/commissions/{id}/dispute': {
+      post: {
+        tags: ['Agent'],
+        summary: 'Dispute a payment marked by admin (agent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string' } } },
+            },
+          },
+        },
+        responses: { '200': { description: 'Disputed' } },
+      },
+    },
+    '/api/agent/commissions/{id}/request-payment': {
+      post: {
+        tags: ['Agent'],
+        summary: 'Request payment for a pending commission (agent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: { type: 'object', properties: { message: { type: 'string' } } },
+            },
+          },
+        },
+        responses: { '200': { description: 'Status → payment_requested' } },
+      },
+    },
+    '/api/agent/commissions/{id}/proof': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Download / view proof of payment for own commission (agent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'inline', in: 'query', schema: { type: 'string', enum: ['1', 'true'] } },
+        ],
+        responses: { '200': { description: 'File' } },
       },
     },
     '/api/applications': {
@@ -551,15 +681,6 @@ export const openapiSpec = {
           },
         },
         responses: { '200': { description: 'Generation summary' } },
-      },
-    },
-    '/api/admin/commissions/{id}/mark-paid': {
-      post: {
-        tags: ['Admin Commissions'],
-        summary: 'Mark a commission as paid (admin)',
-        security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-        responses: { '200': { description: 'Updated' } },
       },
     },
     '/api/admin/commissions/{id}/cancel': {

@@ -14,6 +14,8 @@ import { referralsRouter } from './routes/referrals.js';
 import { agentRouter } from './routes/agent.js';
 import { commissionsRouter } from './routes/commissions.js';
 import { resubmitRouter } from './routes/resubmit.js';
+import { microlenderRouter } from './routes/microlender.js';
+import { startReminderJob } from './services/reminderService.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { openapiSpec } from './openapi/spec.js';
 
@@ -63,6 +65,7 @@ app.use('/api/referrals', referralsRouter);
 app.use('/api/agent', agentRouter);
 app.use('/api/admin/commissions', commissionsRouter);
 app.use('/api/applications/resubmit', resubmitRouter);
+app.use('/api/microlender', microlenderRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -70,6 +73,7 @@ app.use(errorHandler);
 const server = app.listen(config.port, () => {
   console.log(`NCLMS API listening on http://localhost:${config.port} (${config.env})`);
   console.log(`Scalar docs:  http://localhost:${config.port}/docs`);
+  startReminderJob();
 });
 
 const shutdown = (signal: string): void => {

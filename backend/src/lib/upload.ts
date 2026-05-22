@@ -10,8 +10,10 @@ import { badRequest } from './errors.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const uploadsRoot = resolve(__dirname, '..', '..', 'uploads');
 export const applicationsDir = resolve(uploadsRoot, 'applications');
+export const proofsDir       = resolve(uploadsRoot, 'proofs');
 
 await mkdir(applicationsDir, { recursive: true });
+await mkdir(proofsDir,       { recursive: true });
 
 const ALLOWED_MIME = new Set([
   'application/pdf',
@@ -41,4 +43,18 @@ export const applicationUpload = multer({
   storage,
   fileFilter,
   limits: { fileSize: config.maxUploadSize, files: 20 },
+});
+
+const proofStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, proofsDir),
+  filename: (_req, file, cb) => {
+    const ext = extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${randomUUID()}${ext}`);
+  },
+});
+
+export const proofUpload = multer({
+  storage: proofStorage,
+  fileFilter,
+  limits: { fileSize: config.maxUploadSize, files: 1 },
 });

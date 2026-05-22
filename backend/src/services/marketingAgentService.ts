@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { pool, withTransaction } from '../db.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { generateReferralCode } from '../lib/referralCode.js';
+import { sendAgentWelcomeEmail } from './notificationService.js';
 import type {
   CreateMarketingAgentInput,
 } from '../schemas/marketingAgent.js';
@@ -31,17 +32,19 @@ const SELECT_AGENT = `
 export const createMarketingAgent = async (
   input: CreateMarketingAgentInput,
 ): Promise<MarketingAgentRow> => {
-  return withTransaction(async (client) => {
-    const { rows: existing } = await client.query<{ id: string }>(
-      `SELECT id FROM nclms_users WHERE email = $1`,
+  const agent = await withTransaction(async (client) => {
+    const { rows: existing } = await client.query<{ id: string; role: string }>(
+      `SELECT id, role FROM nclms_users WHERE email = $1`,
       [input.email.toLowerCase()],
     );
-    if (existing.length > 0) throw conflict('A user with this email already exists.');
+    if (existing.length > 0) {
+      throw conflict(`An account with this email already exists (role: ${existing[0]!.role}).`);
+    }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
     const { rows: userRows } = await client.query<{ id: string }>(
-      `INSERT INTO nclms_users (email, password_hash, full_name, phone, role, status)
-       VALUES ($1, $2, $3, $4, 'marketing_agent', 'active')
+      `INSERT INTO nclms_users (email, password_hash, full_name, phone, role, status, must_change_password)
+       VALUES ($1, $2, $3, $4, 'marketing_agent', 'active', TRUE)
        RETURNING id`,
       [input.email.toLowerCase(), passwordHash, input.full_name, input.phone ?? null],
     );
@@ -75,6 +78,16 @@ export const createMarketingAgent = async (
     );
     return rows[0]!;
   });
+
+  // Welcome email with credentials and the agent's referral code (fire-and-forget).
+  void sendAgentWelcomeEmail({
+    email: agent.email,
+    fullName: agent.full_name,
+    temporaryPassword: input.password,
+    referralCode: agent.referral_code,
+  }).catch((e) => console.error('[email] agent welcome failed:', e));
+
+  return agent;
 };
 
 export const listMarketingAgents = async (): Promise<MarketingAgentRow[]> => {

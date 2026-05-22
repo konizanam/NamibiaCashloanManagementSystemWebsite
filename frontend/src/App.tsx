@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PublicLayout } from './components/Layout';
 import { Home } from './pages/Home';
 import { About } from './pages/About';
@@ -9,6 +9,7 @@ import { Apply } from './pages/Apply';
 import { ApplyEdit } from './pages/ApplyEdit';
 import { ApplySuccess } from './pages/ApplySuccess';
 import { Login } from './pages/Login';
+import { ChangePassword } from './pages/ChangePassword';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminApplications } from './pages/admin/AdminApplications';
@@ -20,21 +21,38 @@ import { AgentDashboard } from './pages/agent/AgentDashboard';
 import { AgentCommissions } from './pages/agent/AgentCommissions';
 import { AgentMicrolenders } from './pages/agent/AgentMicrolenders';
 import { AgentApplications } from './pages/agent/AgentApplications';
-import { MicrolenderPortal } from './pages/microlender/MicrolenderPortal';
+import { MicrolenderLayout } from './pages/microlender/MicrolenderLayout';
+import { MicrolenderDashboard } from './pages/microlender/MicrolenderDashboard';
+import { MicrolenderProfile } from './pages/microlender/MicrolenderProfile';
 import { useAuth } from './context/AuthContext';
 import type { Role } from './api/types';
 import type { ReactNode } from 'react';
 import { NotFound } from './pages/NotFound';
 
+const HOMES: Record<Role, string> = {
+  admin: '/admin',
+  marketing_agent: '/agent',
+  microlender: '/portal',
+};
+
 const RequireRole = ({ role, children }: { role: Role; children: ReactNode }) => {
+  const { user, loading } = useAuth();
+  const loc = useLocation();
+  if (loading) return <div className="p-12 text-center text-slate-500">Loading…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password && loc.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
+  }
+  if (user.role !== role) {
+    return <Navigate to={HOMES[user.role]} replace />;
+  }
+  return <>{children}</>;
+};
+
+const RequireAnyAuth = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="p-12 text-center text-slate-500">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) {
-    // Logged in but wrong role — bounce to their own home.
-    const homes: Record<Role, string> = { admin: '/admin', marketing_agent: '/agent', microlender: '/' };
-    return <Navigate to={homes[user.role]} replace />;
-  }
   return <>{children}</>;
 };
 
@@ -54,6 +72,8 @@ export default function App() {
         {/* Legacy admin login URL */}
         <Route path="/admin/login" element={<Navigate to="/login" replace />} />
       </Route>
+
+      <Route path="/change-password" element={<RequireAnyAuth><ChangePassword /></RequireAnyAuth>} />
 
       <Route
         path="/admin"
@@ -88,10 +108,13 @@ export default function App() {
         path="/portal"
         element={
           <RequireRole role="microlender">
-            <MicrolenderPortal />
+            <MicrolenderLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<MicrolenderDashboard />} />
+        <Route path="profile" element={<MicrolenderProfile />} />
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>

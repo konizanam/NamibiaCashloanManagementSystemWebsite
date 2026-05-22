@@ -6,6 +6,7 @@ export interface User {
   full_name: string;
   role: Role;
   status?: string;
+  must_change_password?: boolean;
 }
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'requires_info';
@@ -92,7 +93,13 @@ export interface AgentDashboardStats {
   projected_next_month: number;
 }
 
-export type CommissionStatus = 'pending' | 'paid' | 'cancelled';
+export type CommissionStatus =
+  | 'pending'
+  | 'payment_requested'
+  | 'awaiting_agent_confirmation'
+  | 'paid'
+  | 'disputed'
+  | 'cancelled';
 export type CommissionType = 'onboarding' | 'monthly' | 'bonus' | 'adjustment';
 
 export interface Commission {
@@ -114,6 +121,17 @@ export interface Commission {
   created_at: string;
   microlender_name?: string | null;
   agent_name?: string | null;
+  proof_file_name?: string | null;
+  proof_mime_type?: string | null;
+  proof_uploaded_at?: string | null;
+  payment_marked_at?: string | null;
+  agent_confirmed_at?: string | null;
+  agent_disputed_at?: string | null;
+  dispute_reason?: string | null;
+  payment_request_at?: string | null;
+  payment_request_message?: string | null;
+  last_reminder_at?: string | null;
+  reminder_count?: number;
 }
 
 export interface ReferredMicrolender {

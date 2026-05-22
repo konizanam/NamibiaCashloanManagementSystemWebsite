@@ -1,32 +1,75 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { resolve } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import {
   cancel,
   generateMonthlyCommissions,
+  getCommissionById,
   markPaid,
   firstOfMonth,
 } from '../services/commissionService.js';
 import { listCommissionsForAgent } from '../services/agentService.js';
 import { pool } from '../db.js';
-import { generateMonthlySchema, listCommissionsQuerySchema, markPaidSchema } from '../schemas/agent.js';
+import { proofUpload } from '../lib/upload.js';
+import {
+  generateMonthlySchema,
+  listCommissionsQuerySchema,
+} from '../schemas/agent.js';
 import { logAudit } from '../lib/audit.js';
+import { notFound } from '../lib/errors.js';
+import { sendAgentPaymentMarkedEmail } from '../services/notificationService.js';
 
 export const commissionsRouter = Router();
 
-commissionsRouter.use(requireAuth, requireRole('admin'));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-// Admin: list any agent's commissions (filterable + agent_id required for now).
+async function adminEmails(): Promise<string[]> {
+  const { rows } = await pool.query<{ email: string }>(
+    `SELECT email FROM nclms_users WHERE role = 'admin' AND status = 'active'`,
+  );
+  return rows.map((r) => r.email);
+}
+
+async function agentContact(agentId: string): Promise<{ email: string; full_name: string } | null> {
+  const { rows } = await pool.query<{ email: string; full_name: string }>(
+    `SELECT u.email, u.full_name
+       FROM nclms_marketing_agents a
+       JOIN nclms_users u ON u.id = a.user_id
+      WHERE a.id = $1`,
+    [agentId],
+  );
+  return rows[0] ?? null;
+}
+
+async function microlenderName(microlenderId: string | null): Promise<string> {
+  if (!microlenderId) return '—';
+  const { rows } = await pool.query<{ business_name: string }>(
+    `SELECT business_name FROM nclms_microlenders WHERE id = $1`,
+    [microlenderId],
+  );
+  return rows[0]?.business_name ?? '—';
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN routes
+// ---------------------------------------------------------------------------
+const adminRouter = Router();
+adminRouter.use(requireAuth, requireRole('admin'));
+
 const adminListSchema = listCommissionsQuerySchema.extend({
   agent_id: z.string().uuid().optional(),
 });
 
-commissionsRouter.get('/', validate(adminListSchema, 'query'), async (req, res, next) => {
+adminRouter.get('/', validate(adminListSchema, 'query'), async (req, res, next) => {
   try {
     const q = req.query as unknown as {
       agent_id?: string;
-      status?: 'pending' | 'paid' | 'cancelled';
+      status?: 'pending' | 'payment_requested' | 'awaiting_agent_confirmation' | 'paid' | 'disputed' | 'cancelled';
       type?: 'onboarding' | 'monthly' | 'bonus' | 'adjustment';
       period_month?: string;
       limit: number;
@@ -34,7 +77,7 @@ commissionsRouter.get('/', validate(adminListSchema, 'query'), async (req, res, 
     };
     if (q.agent_id) {
       const result = await listCommissionsForAgent(q.agent_id, {
-        status: q.status,
+        status: q.status as never,
         type: q.type,
         period_month: q.period_month,
         limit: q.limit,
@@ -43,7 +86,6 @@ commissionsRouter.get('/', validate(adminListSchema, 'query'), async (req, res, 
       res.json(result);
       return;
     }
-    // No agent filter — return totals across the system (lightweight summary).
     const where: string[] = [];
     const params: unknown[] = [];
     if (q.status)       { params.push(q.status);       where.push(`c.status = $${params.length}`); }
@@ -77,7 +119,7 @@ commissionsRouter.get('/', validate(adminListSchema, 'query'), async (req, res, 
   }
 });
 
-commissionsRouter.post('/generate-monthly', validate(generateMonthlySchema), async (req, res, next) => {
+adminRouter.post('/generate-monthly', validate(generateMonthlySchema), async (req, res, next) => {
   try {
     const auth = (req as AuthedRequest).user!;
     const body = req.body as { period_month: string };
@@ -95,16 +137,26 @@ commissionsRouter.post('/generate-monthly', validate(generateMonthlySchema), asy
   }
 });
 
-commissionsRouter.post(
+adminRouter.post(
   '/:id/mark-paid',
-  validate(markPaidSchema),
+  proofUpload.single('proof'),
   async (req, res, next) => {
+    let savedPath: string | null = null;
     try {
       const auth = (req as AuthedRequest).user!;
-      const body = req.body as { reference?: string };
-      const row = await markPaid(req.params.id!, body.reference);
+      const reference = (req.body as { reference?: string }).reference;
+      const file = req.file;
+      if (file) savedPath = file.path;
+
+      const row = await markPaid(req.params.id!, {
+        reference,
+        proof: file
+          ? { filePath: file.path, fileName: file.originalname, mimeType: file.mimetype }
+          : null,
+      });
       if (!row) {
-        res.status(409).json({ error: 'conflict', message: 'Commission is not pending or does not exist.' });
+        if (savedPath) await unlink(savedPath).catch(() => undefined);
+        res.status(409).json({ error: 'conflict', message: 'Commission is not pending/requested or does not exist.' });
         return;
       }
       await logAudit({
@@ -113,23 +165,38 @@ commissionsRouter.post(
         action: 'commissions.mark_paid',
         entityType: 'commission',
         entityId: row.id,
-        metadata: { reference: body.reference ?? null },
+        metadata: { reference: reference ?? null, has_proof: !!file },
         ipAddress: req.ip,
       });
+
+      // Notify the agent so they can confirm receipt.
+      const agent = await agentContact(row.agent_id);
+      if (agent) {
+        void sendAgentPaymentMarkedEmail({
+          agentEmail: agent.email,
+          agentName: agent.full_name,
+          microlenderName: await microlenderName(row.microlender_id),
+          amount: Number(row.amount),
+          reference: reference,
+          periodMonth: row.period_month,
+          hasProof: !!file,
+        }).catch((e) => console.error('[email] payment-marked email failed:', e));
+      }
       res.json(row);
     } catch (err) {
+      if (savedPath) await unlink(savedPath).catch(() => undefined);
       next(err);
     }
   },
 );
 
-commissionsRouter.post('/:id/cancel', async (req, res, next) => {
+adminRouter.post('/:id/cancel', async (req, res, next) => {
   try {
     const auth = (req as AuthedRequest).user!;
     const reason = (req.body as { reason?: string })?.reason;
     const row = await cancel(req.params.id!, reason);
     if (!row) {
-      res.status(409).json({ error: 'conflict', message: 'Commission is not pending or does not exist.' });
+      res.status(409).json({ error: 'conflict', message: 'Commission cannot be cancelled in its current state.' });
       return;
     }
     await logAudit({
@@ -146,3 +213,31 @@ commissionsRouter.post('/:id/cancel', async (req, res, next) => {
     next(err);
   }
 });
+
+// Admin downloads / views a commission's proof file.
+adminRouter.get('/:id/proof', async (req, res, next) => {
+  try {
+    const row = await getCommissionById(req.params.id!);
+    if (!row || !row.proof_file_path) throw notFound('No proof of payment uploaded.');
+    const absolute = resolve(row.proof_file_path);
+    const inline = req.query.inline === '1' || req.query.inline === 'true';
+    if (inline) {
+      if (row.proof_mime_type) res.setHeader('Content-Type', row.proof_mime_type);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.proof_file_name ?? 'proof')}"`);
+      res.sendFile(absolute);
+    } else {
+      res.download(absolute, row.proof_file_name ?? 'proof');
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+commissionsRouter.use('/', adminRouter);
+
+// Helpers used by routes/agent.ts for agent-side commission actions.
+export const commissionsHelpers = {
+  adminEmails,
+  agentContact,
+  microlenderName,
+};

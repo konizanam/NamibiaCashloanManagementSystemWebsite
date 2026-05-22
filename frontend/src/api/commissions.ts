@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, getToken } from './client';
 import type { Commission, CommissionStatus, CommissionType, Paginated } from './types';
 
 export interface AdminListCommissionsOpts {
@@ -22,19 +22,44 @@ export const adminListCommissions = (opts: AdminListCommissionsOpts = {}) => {
 };
 
 export const generateMonthly = (period_month: string) =>
-  api<{ created: number; skipped: number }>('/api/admin/commissions/generate-monthly', {
+  api<{ created: number; skipped: number; expired: number }>('/api/admin/commissions/generate-monthly', {
     method: 'POST',
     json: { period_month },
   });
 
-export const markPaid = (id: string, reference?: string) =>
-  api<Commission>(`/api/admin/commissions/${id}/mark-paid`, {
+export const markPaidWithProof = async (id: string, reference: string | undefined, proof?: File): Promise<Commission> => {
+  const token = getToken();
+  const fd = new FormData();
+  if (reference) fd.append('reference', reference);
+  if (proof) fd.append('proof', proof);
+  const res = await fetch(`/api/admin/commissions/${id}/mark-paid`, {
     method: 'POST',
-    json: { reference },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
   });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(payload.message ?? `Request failed (${res.status})`), {
+      status: res.status,
+      code: payload.error,
+    });
+  }
+  return res.json();
+};
 
 export const cancelCommission = (id: string, reason?: string) =>
   api<Commission>(`/api/admin/commissions/${id}/cancel`, {
     method: 'POST',
     json: { reason },
   });
+
+// ---- Agent-side actions ----
+
+export const confirmCommissionPayment = (id: string) =>
+  api<Commission>(`/api/agent/commissions/${id}/confirm`, { method: 'POST', json: {} });
+
+export const disputeCommissionPayment = (id: string, reason: string) =>
+  api<Commission>(`/api/agent/commissions/${id}/dispute`, { method: 'POST', json: { reason } });
+
+export const requestCommissionPayment = (id: string, message?: string) =>
+  api<Commission>(`/api/agent/commissions/${id}/request-payment`, { method: 'POST', json: { message } });

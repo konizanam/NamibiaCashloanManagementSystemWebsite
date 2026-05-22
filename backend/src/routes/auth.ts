@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
-import { loginSchema } from '../schemas/auth.js';
-import { getMe, login } from '../services/authService.js';
+import { changePasswordSchema, loginSchema } from '../schemas/auth.js';
+import { changePassword, getMe, login } from '../services/authService.js';
 import { logAudit } from '../lib/audit.js';
 
 export const authRouter = Router();
@@ -32,3 +32,25 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  validate(changePasswordSchema),
+  async (req, res, next) => {
+    try {
+      const auth = (req as AuthedRequest).user!;
+      const body = req.body as { current_password: string; new_password: string };
+      await changePassword(auth.sub, body.current_password, body.new_password);
+      await logAudit({
+        actorId: auth.sub,
+        actorRole: auth.role,
+        action: 'auth.change_password',
+        ipAddress: req.ip,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

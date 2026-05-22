@@ -8,6 +8,14 @@ import {
   type Tier,
 } from '../lib/pricing.js';
 
+export type CommissionStatus =
+  | 'pending'
+  | 'payment_requested'
+  | 'awaiting_agent_confirmation'
+  | 'paid'
+  | 'disputed'
+  | 'cancelled';
+
 export interface CommissionRow {
   id: string;
   agent_id: string;
@@ -20,11 +28,23 @@ export interface CommissionRow {
   base_amount: string | null;
   amount: string;
   currency: string;
-  status: 'pending' | 'paid' | 'cancelled';
+  status: CommissionStatus;
   paid_at: string | null;
   paid_reference: string | null;
   notes: string | null;
   created_at: string;
+  proof_file_path: string | null;
+  proof_file_name: string | null;
+  proof_mime_type: string | null;
+  proof_uploaded_at: string | null;
+  payment_marked_at: string | null;
+  agent_confirmed_at: string | null;
+  agent_disputed_at: string | null;
+  dispute_reason: string | null;
+  payment_request_at: string | null;
+  payment_request_message: string | null;
+  last_reminder_at: string | null;
+  reminder_count: number;
 }
 
 export interface CreateOnboardingCommissionInput {
@@ -140,16 +160,98 @@ export async function generateMonthlyCommissions(
   return { created, skipped, expired };
 }
 
-export async function markPaid(id: string, reference?: string | null): Promise<CommissionRow | null> {
+export interface MarkPaidInput {
+  reference?: string | null;
+  proof?: {
+    filePath: string;
+    fileName: string;
+    mimeType: string;
+  } | null;
+}
+
+/**
+ * Admin marks the payment as made. Status moves to "awaiting_agent_confirmation".
+ * The commission is not considered "paid" yet — the agent must confirm receipt.
+ */
+export async function markPaid(id: string, input: MarkPaidInput): Promise<CommissionRow | null> {
+  const proof = input.proof ?? null;
+  const { rows } = await pool.query<CommissionRow>(
+    `UPDATE nclms_agent_commissions
+        SET status = 'awaiting_agent_confirmation',
+            paid_reference = $2,
+            payment_marked_at = NOW(),
+            proof_file_path = COALESCE($3, proof_file_path),
+            proof_file_name = COALESCE($4, proof_file_name),
+            proof_mime_type = COALESCE($5, proof_mime_type),
+            proof_uploaded_at = CASE WHEN $3 IS NULL THEN proof_uploaded_at ELSE NOW() END,
+            last_reminder_at = NULL,
+            reminder_count = 0,
+            updated_at = NOW()
+      WHERE id = $1 AND status IN ('pending','payment_requested')
+      RETURNING *`,
+    [
+      id,
+      input.reference ?? null,
+      proof?.filePath ?? null,
+      proof?.fileName ?? null,
+      proof?.mimeType ?? null,
+    ],
+  );
+  return rows[0] ?? null;
+}
+
+/** Agent confirms receipt: status → paid. */
+export async function confirmPayment(id: string, agentId: string): Promise<CommissionRow | null> {
   const { rows } = await pool.query<CommissionRow>(
     `UPDATE nclms_agent_commissions
         SET status = 'paid',
-            paid_at = NOW(),
-            paid_reference = $2,
+            agent_confirmed_at = NOW(),
+            paid_at = COALESCE(paid_at, NOW()),
+            last_reminder_at = NULL,
             updated_at = NOW()
-      WHERE id = $1 AND status = 'pending'
+      WHERE id = $1 AND agent_id = $2 AND status = 'awaiting_agent_confirmation'
       RETURNING *`,
-    [id, reference ?? null],
+    [id, agentId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Agent disputes: status → disputed, captures reason. */
+export async function disputePayment(
+  id: string,
+  agentId: string,
+  reason: string,
+): Promise<CommissionRow | null> {
+  const { rows } = await pool.query<CommissionRow>(
+    `UPDATE nclms_agent_commissions
+        SET status = 'disputed',
+            agent_disputed_at = NOW(),
+            dispute_reason = $3,
+            updated_at = NOW()
+      WHERE id = $1 AND agent_id = $2 AND status = 'awaiting_agent_confirmation'
+      RETURNING *`,
+    [id, agentId, reason],
+  );
+  return rows[0] ?? null;
+}
+
+/** Agent formally requests payment for a pending commission. */
+export async function requestPayment(
+  id: string,
+  agentId: string,
+  message?: string,
+): Promise<CommissionRow | null> {
+  const { rows } = await pool.query<CommissionRow>(
+    `UPDATE nclms_agent_commissions
+        SET status = 'payment_requested',
+            payment_request_at = NOW(),
+            payment_request_message = $3,
+            last_reminder_at = NULL,
+            reminder_count = 0,
+            updated_at = NOW()
+      WHERE id = $1 AND agent_id = $2 AND status = 'pending'
+      RETURNING *`,
+    [id, agentId, message ?? null],
   );
   return rows[0] ?? null;
 }
@@ -159,9 +261,17 @@ export async function cancel(id: string, reason?: string | null): Promise<Commis
     `UPDATE nclms_agent_commissions
         SET status = 'cancelled', updated_at = NOW(),
             notes  = COALESCE(notes, '') || CASE WHEN $2::text IS NULL OR $2::text = '' THEN '' ELSE E'\\n[cancelled] ' || $2::text END
-      WHERE id = $1 AND status = 'pending'
+      WHERE id = $1 AND status IN ('pending','payment_requested','disputed')
       RETURNING *`,
     [id, reason ?? null],
+  );
+  return rows[0] ?? null;
+}
+
+export async function getCommissionById(id: string): Promise<CommissionRow | null> {
+  const { rows } = await pool.query<CommissionRow>(
+    `SELECT * FROM nclms_agent_commissions WHERE id = $1`,
+    [id],
   );
   return rows[0] ?? null;
 }

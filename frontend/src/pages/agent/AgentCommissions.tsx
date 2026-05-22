@@ -1,17 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchAgentCommissions } from '../../api/agent';
+import {
+  confirmCommissionPayment,
+  disputeCommissionPayment,
+  requestCommissionPayment,
+} from '../../api/commissions';
+import { getToken } from '../../api/client';
 import type { Commission, CommissionStatus, CommissionType, Paginated } from '../../api/types';
 
 const fmtNAD = (n: number | string) =>
   new Intl.NumberFormat('en-NA', { style: 'currency', currency: 'NAD' }).format(Number(n));
 
 const STATUS_LABELS: Record<CommissionStatus, string> = {
-  pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled',
+  pending:                       'Pending',
+  payment_requested:             'Payment requested',
+  awaiting_agent_confirmation:   'Awaiting your confirmation',
+  paid:                          'Paid',
+  disputed:                      'Disputed',
+  cancelled:                     'Cancelled',
 };
 const STATUS_CLASSES: Record<CommissionStatus, string> = {
-  pending: 'badge-pending', paid: 'badge-approved', cancelled: 'badge-rejected',
+  pending:                       'badge-pending',
+  payment_requested:             'badge-info',
+  awaiting_agent_confirmation:   'badge-info',
+  paid:                          'badge-approved',
+  disputed:                      'badge-rejected',
+  cancelled:                     'badge-rejected',
 };
-
 const TYPE_LABELS: Record<CommissionType, string> = {
   onboarding: 'Onboarding', monthly: 'Monthly', bonus: 'Bonus', adjustment: 'Adjustment',
 };
@@ -31,16 +46,29 @@ const monthOptions = (): { value: string; label: string }[] => {
   return out;
 };
 
+const viewMyProof = async (commissionId: string) => {
+  const token = getToken();
+  const res = await fetch(`/api/agent/commissions/${commissionId}/proof?inline=1`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};
+
 export const AgentCommissions = () => {
   const [data, setData] = useState<Paginated<Commission> | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CommissionStatus | ''>('');
   const [type, setType] = useState<CommissionType | ''>('');
   const [period, setPeriod] = useState<string>('');
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const months = useMemo(monthOptions, []);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
     fetchAgentCommissions({
       status: status || undefined,
@@ -50,7 +78,8 @@ export const AgentCommissions = () => {
     })
       .then(setData)
       .finally(() => setLoading(false));
-  }, [status, type, period]);
+  };
+  useEffect(load, [status, type, period]);
 
   const summary = useMemo(() => {
     if (!data) return { earned: 0, pending: 0, paid: 0 };
@@ -58,17 +87,38 @@ export const AgentCommissions = () => {
       (acc, c) => {
         const a = Number(c.amount);
         if (c.status === 'paid')    { acc.paid += a;    acc.earned += a; }
-        if (c.status === 'pending') { acc.pending += a; acc.earned += a; }
+        if (c.status === 'pending' || c.status === 'payment_requested' || c.status === 'awaiting_agent_confirmation') {
+          acc.pending += a; acc.earned += a;
+        }
         return acc;
       },
       { earned: 0, pending: 0, paid: 0 },
     );
   }, [data]);
 
+  const doConfirm = async (id: string) => {
+    setActionErr(null);
+    try { await confirmCommissionPayment(id); load(); }
+    catch (e) { setActionErr((e as Error).message); }
+  };
+  const doDispute = async (id: string) => {
+    const reason = window.prompt('What looks wrong? (this goes to Koniza)') ?? '';
+    if (reason.trim().length < 3) return;
+    setActionErr(null);
+    try { await disputeCommissionPayment(id, reason.trim()); load(); }
+    catch (e) { setActionErr((e as Error).message); }
+  };
+  const doRequest = async (id: string) => {
+    const note = window.prompt('Add an optional note for Koniza (banking details, etc.)') ?? '';
+    setActionErr(null);
+    try { await requestCommissionPayment(id, note.trim() || undefined); load(); }
+    catch (e) { setActionErr((e as Error).message); }
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-extrabold text-brand-navy">Commissions</h1>
-      <p className="text-slate-600 text-sm mt-1">All commissions credited to your account.</p>
+      <p className="text-slate-600 text-sm mt-1">All commissions credited to your account. Confirm or dispute payments here, or request payment for a pending commission.</p>
 
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
         <div className="card p-4">
@@ -76,11 +126,11 @@ export const AgentCommissions = () => {
           <div className="text-xl font-extrabold text-brand-navy mt-1">{fmtNAD(summary.earned)}</div>
         </div>
         <div className="card p-4 border-l-4 border-brand-amber">
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Filter total — pending</div>
+          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Outstanding</div>
           <div className="text-xl font-extrabold text-brand-navy mt-1">{fmtNAD(summary.pending)}</div>
         </div>
         <div className="card p-4 border-l-4 border-brand-green">
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Filter total — paid</div>
+          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Paid + confirmed</div>
           <div className="text-xl font-extrabold text-brand-navy mt-1">{fmtNAD(summary.paid)}</div>
         </div>
       </div>
@@ -108,25 +158,28 @@ export const AgentCommissions = () => {
         </div>
       </div>
 
+      {actionErr && (
+        <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{actionErr}</div>
+      )}
+
       <div className="card mt-4 overflow-hidden">
         <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-5 py-3">Period</th>
               <th className="px-5 py-3">Microlender</th>
               <th className="px-5 py-3">Type</th>
-              <th className="px-5 py-3">Tier</th>
-              <th className="px-5 py-3">Rate</th>
               <th className="px-5 py-3 text-right">Amount</th>
               <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Paid on</th>
+              <th className="px-5 py-3">Proof</th>
+              <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={8} className="px-5 py-8 text-center text-slate-500">Loading…</td></tr>}
+            {loading && <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-500">Loading…</td></tr>}
             {!loading && data?.items.length === 0 && (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">No commissions match the current filters.</td></tr>
+              <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-500">No commissions match the current filters.</td></tr>
             )}
             {!loading && data?.items.map((c) => (
               <tr key={c.id} className="border-t border-slate-100">
@@ -135,11 +188,35 @@ export const AgentCommissions = () => {
                 </td>
                 <td className="px-5 py-3 font-semibold text-brand-navy">{c.microlender_name || '—'}</td>
                 <td className="px-5 py-3">{TYPE_LABELS[c.type]}</td>
-                <td className="px-5 py-3 text-slate-600">{c.tier ? c.tier.replace('tier', 'Tier ') : '—'}</td>
-                <td className="px-5 py-3 text-slate-600">{c.rate_applied ? `${Number(c.rate_applied).toFixed(2)}%` : '—'}</td>
                 <td className="px-5 py-3 text-right font-bold text-brand-navy">{fmtNAD(c.amount)}</td>
-                <td className="px-5 py-3"><span className={STATUS_CLASSES[c.status]}>{STATUS_LABELS[c.status]}</span></td>
-                <td className="px-5 py-3 text-slate-600">{c.paid_at ? new Date(c.paid_at).toLocaleDateString() : '—'}</td>
+                <td className="px-5 py-3">
+                  <span className={STATUS_CLASSES[c.status]}>{STATUS_LABELS[c.status]}</span>
+                  {c.status === 'awaiting_agent_confirmation' && c.paid_reference && (
+                    <div className="text-xs text-slate-500 mt-1">Ref: <span className="font-mono">{c.paid_reference}</span></div>
+                  )}
+                </td>
+                <td className="px-5 py-3">
+                  {c.proof_file_name
+                    ? <button onClick={() => viewMyProof(c.id)} className="text-xs font-semibold text-brand-navy hover:underline">View</button>
+                    : <span className="text-xs text-slate-400">—</span>}
+                </td>
+                <td className="px-5 py-3 text-right whitespace-nowrap">
+                  {c.status === 'pending' && (
+                    <button onClick={() => doRequest(c.id)} className="text-xs font-semibold text-brand-amber hover:underline">
+                      Request payment
+                    </button>
+                  )}
+                  {c.status === 'awaiting_agent_confirmation' && (
+                    <>
+                      <button onClick={() => doConfirm(c.id)} className="text-xs font-semibold text-brand-green-dark hover:underline mr-3">
+                        Confirm receipt
+                      </button>
+                      <button onClick={() => doDispute(c.id)} className="text-xs font-semibold text-red-600 hover:underline">
+                        Dispute
+                      </button>
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
