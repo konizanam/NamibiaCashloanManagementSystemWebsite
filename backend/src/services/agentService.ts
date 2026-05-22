@@ -6,6 +6,7 @@ import {
   monthlyCommissionRate,
   type Tier,
 } from '../lib/pricing.js';
+import { COMMISSION_COLUMNS } from './commissionService.js';
 
 export interface AgentProfile {
   id: string;
@@ -120,8 +121,9 @@ export async function listCommissionsForAgent(agentId: string, opts: ListCommiss
   if (opts.period_month) { params.push(opts.period_month); where.push(`c.period_month = $${params.length}`); }
 
   params.push(opts.limit, opts.offset);
+  const columnsAliased = COMMISSION_COLUMNS.split(',').map((c) => `c.${c.trim()}`).join(', ');
   const { rows } = await pool.query(
-    `SELECT c.*,
+    `SELECT ${columnsAliased},
             m.business_name AS microlender_name
        FROM nclms_agent_commissions c
        LEFT JOIN nclms_microlenders m ON m.id = c.microlender_id

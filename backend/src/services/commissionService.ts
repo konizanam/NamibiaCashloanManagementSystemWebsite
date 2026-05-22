@@ -163,11 +163,22 @@ export async function generateMonthlyCommissions(
 export interface MarkPaidInput {
   reference?: string | null;
   proof?: {
-    filePath: string;
+    content: Buffer;
     fileName: string;
     mimeType: string;
   } | null;
 }
+
+// Columns to load when listing or returning commission rows. Deliberately
+// omits the BYTEA `proof_content` so a list query doesn't pull every PDF/image.
+export const COMMISSION_COLUMNS = `
+  id, agent_id, microlender_id, application_id, period_month, type, tier,
+  rate_applied, base_amount, amount, currency, status, paid_at, paid_reference,
+  notes, created_at, proof_file_path, proof_file_name, proof_mime_type,
+  proof_uploaded_at, payment_marked_at, agent_confirmed_at, agent_disputed_at,
+  dispute_reason, payment_request_at, payment_request_message, last_reminder_at,
+  reminder_count
+`;
 
 /**
  * Admin marks the payment as made. Status moves to "awaiting_agent_confirmation".
@@ -180,7 +191,7 @@ export async function markPaid(id: string, input: MarkPaidInput): Promise<Commis
         SET status = 'awaiting_agent_confirmation',
             paid_reference = $2,
             payment_marked_at = NOW(),
-            proof_file_path = COALESCE($3, proof_file_path),
+            proof_content = COALESCE($3, proof_content),
             proof_file_name = COALESCE($4, proof_file_name),
             proof_mime_type = COALESCE($5, proof_mime_type),
             proof_uploaded_at = CASE WHEN $3 IS NULL THEN proof_uploaded_at ELSE NOW() END,
@@ -188,16 +199,49 @@ export async function markPaid(id: string, input: MarkPaidInput): Promise<Commis
             reminder_count = 0,
             updated_at = NOW()
       WHERE id = $1 AND status IN ('pending','payment_requested')
-      RETURNING *`,
+      RETURNING ${COMMISSION_COLUMNS}`,
     [
       id,
       input.reference ?? null,
-      proof?.filePath ?? null,
+      proof?.content ?? null,
       proof?.fileName ?? null,
       proof?.mimeType ?? null,
     ],
   );
   return rows[0] ?? null;
+}
+
+export interface CommissionProof {
+  content: Buffer;
+  fileName: string | null;
+  mimeType: string | null;
+}
+
+/** Read proof of payment binary content from the database. */
+export async function getCommissionProof(
+  id: string,
+  ownerAgentId?: string,
+): Promise<CommissionProof | null> {
+  const params: unknown[] = [id];
+  let extra = '';
+  if (ownerAgentId) {
+    params.push(ownerAgentId);
+    extra = ' AND agent_id = $2';
+  }
+  const { rows } = await pool.query<{
+    proof_content: Buffer | null;
+    proof_file_name: string | null;
+    proof_mime_type: string | null;
+  }>(
+    `SELECT proof_content, proof_file_name, proof_mime_type
+       FROM nclms_agent_commissions
+      WHERE id = $1${extra}`,
+    params,
+  );
+  if (rows.length === 0) return null;
+  const r = rows[0]!;
+  if (!r.proof_content) return null;
+  return { content: r.proof_content, fileName: r.proof_file_name, mimeType: r.proof_mime_type };
 }
 
 /** Agent confirms receipt: status → paid. */
@@ -210,7 +254,7 @@ export async function confirmPayment(id: string, agentId: string): Promise<Commi
             last_reminder_at = NULL,
             updated_at = NOW()
       WHERE id = $1 AND agent_id = $2 AND status = 'awaiting_agent_confirmation'
-      RETURNING *`,
+      RETURNING ${COMMISSION_COLUMNS}`,
     [id, agentId],
   );
   return rows[0] ?? null;
@@ -229,7 +273,7 @@ export async function disputePayment(
             dispute_reason = $3,
             updated_at = NOW()
       WHERE id = $1 AND agent_id = $2 AND status = 'awaiting_agent_confirmation'
-      RETURNING *`,
+      RETURNING ${COMMISSION_COLUMNS}`,
     [id, agentId, reason],
   );
   return rows[0] ?? null;
@@ -250,7 +294,7 @@ export async function requestPayment(
             reminder_count = 0,
             updated_at = NOW()
       WHERE id = $1 AND agent_id = $2 AND status = 'pending'
-      RETURNING *`,
+      RETURNING ${COMMISSION_COLUMNS}`,
     [id, agentId, message ?? null],
   );
   return rows[0] ?? null;
@@ -262,7 +306,7 @@ export async function cancel(id: string, reason?: string | null): Promise<Commis
         SET status = 'cancelled', updated_at = NOW(),
             notes  = COALESCE(notes, '') || CASE WHEN $2::text IS NULL OR $2::text = '' THEN '' ELSE E'\\n[cancelled] ' || $2::text END
       WHERE id = $1 AND status IN ('pending','payment_requested','disputed')
-      RETURNING *`,
+      RETURNING ${COMMISSION_COLUMNS}`,
     [id, reason ?? null],
   );
   return rows[0] ?? null;
@@ -270,7 +314,7 @@ export async function cancel(id: string, reason?: string | null): Promise<Commis
 
 export async function getCommissionById(id: string): Promise<CommissionRow | null> {
   const { rows } = await pool.query<CommissionRow>(
-    `SELECT * FROM nclms_agent_commissions WHERE id = $1`,
+    `SELECT ${COMMISSION_COLUMNS} FROM nclms_agent_commissions WHERE id = $1`,
     [id],
   );
   return rows[0] ?? null;

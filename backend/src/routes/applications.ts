@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import { resolve } from 'node:path';
-import { unlink } from 'node:fs/promises';
 import { applicationUpload } from '../lib/upload.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
@@ -47,7 +45,6 @@ applicationsRouter.post(
   '/',
   applicationUpload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.name, maxCount: d.maxCount }))),
   async (req, res, next) => {
-    let savedPaths: string[] = [];
     try {
       const parsed = createApplicationSchema.parse(req.body);
       const files = req.files as Record<string, Express.Multer.File[] | undefined>;
@@ -59,11 +56,10 @@ applicationsRouter.post(
           documents.push({
             documentType: field.type,
             fileName: f.originalname,
-            filePath: f.path,
+            content: f.buffer,
             fileSize: f.size,
             mimeType: f.mimetype,
           });
-          savedPaths.push(f.path);
         }
       }
 
@@ -101,9 +97,6 @@ applicationsRouter.post(
         message: 'Application submitted. You will receive an email once it has been reviewed.',
       });
     } catch (err) {
-      await Promise.all(
-        savedPaths.map((p) => unlink(p).catch(() => undefined)),
-      );
       next(err);
     }
   },
@@ -231,6 +224,7 @@ applicationsRouter.post(
 );
 
 // Admin — download or inline-view a document (?inline=1 streams it without attachment).
+// Content is read directly from Postgres; no disk lookup.
 applicationsRouter.get(
   '/:id/documents/:documentId',
   requireAuth,
@@ -238,18 +232,13 @@ applicationsRouter.get(
   async (req, res, next) => {
     try {
       const doc = await getDocumentForDownload(req.params.documentId!);
-      const absolute = resolve(doc.file_path);
       const inline = req.query.inline === '1' || req.query.inline === 'true';
-      if (inline) {
-        if (doc.mime_type) res.setHeader('Content-Type', doc.mime_type);
-        res.setHeader(
-          'Content-Disposition',
-          `inline; filename="${encodeURIComponent(doc.file_name)}"`,
-        );
-        res.sendFile(absolute);
-      } else {
-        res.download(absolute, doc.file_name);
-      }
+      if (doc.mime_type) res.setHeader('Content-Type', doc.mime_type);
+      res.setHeader(
+        'Content-Disposition',
+        `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(doc.file_name)}"`,
+      );
+      res.send(doc.content);
     } catch (err) {
       next(err);
     }

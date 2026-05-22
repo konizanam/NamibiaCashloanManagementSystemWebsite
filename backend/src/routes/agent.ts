@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { resolve } from 'node:path';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { listCommissionsQuerySchema } from '../schemas/agent.js';
@@ -15,6 +14,7 @@ import {
   confirmPayment,
   disputePayment,
   getCommissionById,
+  getCommissionProof,
   requestPayment,
 } from '../services/commissionService.js';
 import { commissionsHelpers } from './commissions.js';
@@ -202,17 +202,16 @@ agentRouter.post(
 agentRouter.get('/commissions/:id/proof', async (req, res, next) => {
   try {
     const auth = (req as AuthedRequest).user!;
-    const { row } = await getOwnedCommission(auth.sub, req.params.id!);
-    if (!row.proof_file_path) throw notFound('No proof of payment uploaded.');
-    const absolute = resolve(row.proof_file_path);
+    const { profile, row } = await getOwnedCommission(auth.sub, req.params.id!);
+    const proof = await getCommissionProof(row.id, profile.id);
+    if (!proof) throw notFound('No proof of payment uploaded.');
     const inline = req.query.inline === '1' || req.query.inline === 'true';
-    if (inline) {
-      if (row.proof_mime_type) res.setHeader('Content-Type', row.proof_mime_type);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.proof_file_name ?? 'proof')}"`);
-      res.sendFile(absolute);
-    } else {
-      res.download(absolute, row.proof_file_name ?? 'proof');
-    }
+    if (proof.mimeType) res.setHeader('Content-Type', proof.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(proof.fileName ?? 'proof')}"`,
+    );
+    res.send(proof.content);
   } catch (err) {
     next(err);
   }

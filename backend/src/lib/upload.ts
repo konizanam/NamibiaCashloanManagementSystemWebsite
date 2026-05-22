@@ -1,19 +1,7 @@
 import multer, { type FileFilterCallback } from 'multer';
-import { mkdir } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, extname, resolve } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { config } from '../config.js';
 import { badRequest } from './errors.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-export const uploadsRoot = resolve(__dirname, '..', '..', 'uploads');
-export const applicationsDir = resolve(uploadsRoot, 'applications');
-export const proofsDir       = resolve(uploadsRoot, 'proofs');
-
-await mkdir(applicationsDir, { recursive: true });
-await mkdir(proofsDir,       { recursive: true });
 
 const ALLOWED_MIME = new Set([
   'application/pdf',
@@ -23,14 +11,6 @@ const ALLOWED_MIME = new Set([
   'image/webp',
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, applicationsDir),
-  filename: (_req, file, cb) => {
-    const ext = extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${randomUUID()}${ext}`);
-  },
-});
-
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCallback): void => {
   if (!ALLOWED_MIME.has(file.mimetype)) {
     cb(badRequest(`Unsupported file type: ${file.mimetype}. Allow PDF, PNG, JPG, WebP.`));
@@ -39,22 +19,17 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCall
   cb(null, true);
 };
 
+// In-memory buffer per upload — files land directly in DB, never on disk.
+const memoryStorage = multer.memoryStorage();
+
 export const applicationUpload = multer({
-  storage,
+  storage: memoryStorage,
   fileFilter,
   limits: { fileSize: config.maxUploadSize, files: 20 },
 });
 
-const proofStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, proofsDir),
-  filename: (_req, file, cb) => {
-    const ext = extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${randomUUID()}${ext}`);
-  },
-});
-
 export const proofUpload = multer({
-  storage: proofStorage,
+  storage: memoryStorage,
   fileFilter,
   limits: { fileSize: config.maxUploadSize, files: 1 },
 });

@@ -23,7 +23,7 @@ export type DocumentType =
 export interface UploadedDocInput {
   documentType: DocumentType;
   fileName: string;
-  filePath: string;
+  content: Buffer;
   fileSize: number;
   mimeType: string;
 }
@@ -61,10 +61,13 @@ export interface ApplicationDocumentRow {
   application_id: string;
   document_type: DocumentType;
   file_name: string;
-  file_path: string;
   file_size: number | null;
   mime_type: string | null;
   uploaded_at: Date;
+}
+
+export interface ApplicationDocumentWithContent extends ApplicationDocumentRow {
+  content: Buffer;
 }
 
 async function resolveReferralAgentId(code: string | null | undefined): Promise<string | null> {
@@ -166,9 +169,9 @@ export const createApplication = async (
     for (const doc of documents) {
       await client.query(
         `INSERT INTO nclms_application_documents
-           (application_id, document_type, file_name, file_path, file_size, mime_type)
+           (application_id, document_type, file_name, content, file_size, mime_type)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [application.id, doc.documentType, doc.fileName, doc.filePath, doc.fileSize, doc.mimeType],
+        [application.id, doc.documentType, doc.fileName, doc.content, doc.fileSize, doc.mimeType],
       );
     }
 
@@ -237,8 +240,12 @@ export const getApplicationWithDocuments = async (id: string) => {
   const application = rows[0];
   if (!application) throw notFound('Application not found');
 
+  // Deliberately excludes `content` so list views don't load every PDF into memory.
   const { rows: docs } = await pool.query<ApplicationDocumentRow>(
-    `SELECT * FROM nclms_application_documents WHERE application_id = $1 ORDER BY uploaded_at ASC`,
+    `SELECT id, application_id, document_type, file_name, file_size, mime_type, uploaded_at
+       FROM nclms_application_documents
+      WHERE application_id = $1
+      ORDER BY uploaded_at ASC`,
     [id],
   );
 
@@ -534,11 +541,14 @@ function generateTempPassword(): string {
 
 export const getDocumentForDownload = async (
   documentId: string,
-): Promise<ApplicationDocumentRow> => {
-  const { rows } = await pool.query<ApplicationDocumentRow>(
-    `SELECT * FROM nclms_application_documents WHERE id = $1`,
+): Promise<ApplicationDocumentWithContent> => {
+  const { rows } = await pool.query<ApplicationDocumentWithContent>(
+    `SELECT id, application_id, document_type, file_name, file_size, mime_type,
+            uploaded_at, content
+       FROM nclms_application_documents WHERE id = $1`,
     [documentId],
   );
   if (rows.length === 0) throw notFound('Document not found');
+  if (!rows[0]!.content) throw notFound('Document content is missing for this record.');
   return rows[0]!;
 };

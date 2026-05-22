@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { unlink } from 'node:fs/promises';
 import { pool } from '../db.js';
 import { verifyResubmitToken } from '../lib/jwt.js';
 import { unauthorized, notFound, conflict } from '../lib/errors.js';
@@ -72,7 +71,6 @@ resubmitRouter.post(
   '/:token',
   applicationUpload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.name, maxCount: d.maxCount }))),
   async (req, res, next) => {
-    const savedPaths: string[] = [];
     try {
       const { application } = await loadFromToken(req.params.token!);
       const parsed = resubmitApplicationSchema.parse(req.body);
@@ -105,12 +103,11 @@ resubmitRouter.post(
       for (const field of DOCUMENT_FIELDS) {
         const arr = files[field.name] ?? [];
         for (const f of arr) {
-          savedPaths.push(f.path);
           await pool.query(
             `INSERT INTO nclms_application_documents
-               (application_id, document_type, file_name, file_path, file_size, mime_type)
+               (application_id, document_type, file_name, content, file_size, mime_type)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [newApp.id, field.type, f.originalname, f.path, f.size, f.mimetype],
+            [newApp.id, field.type, f.originalname, f.buffer, f.size, f.mimetype],
           );
           docsAdded++;
         }
@@ -146,7 +143,6 @@ resubmitRouter.post(
         message: 'Your application has been resubmitted and is back in our review queue.',
       });
     } catch (err) {
-      await Promise.all(savedPaths.map((p) => unlink(p).catch(() => undefined)));
       next(err);
     }
   },

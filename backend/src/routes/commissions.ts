@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { resolve } from 'node:path';
-import { unlink } from 'node:fs/promises';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import {
   cancel,
+  COMMISSION_COLUMNS,
   generateMonthlyCommissions,
-  getCommissionById,
+  getCommissionProof,
   markPaid,
   firstOfMonth,
 } from '../services/commissionService.js';
@@ -93,8 +92,9 @@ adminRouter.get('/', validate(adminListSchema, 'query'), async (req, res, next) 
     if (q.period_month) { params.push(q.period_month); where.push(`c.period_month = $${params.length}`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     params.push(q.limit, q.offset);
+    const columnsAliased = COMMISSION_COLUMNS.split(',').map((s) => `c.${s.trim()}`).join(', ');
     const { rows } = await pool.query(
-      `SELECT c.*, m.business_name AS microlender_name, u.full_name AS agent_name
+      `SELECT ${columnsAliased}, m.business_name AS microlender_name, u.full_name AS agent_name
          FROM nclms_agent_commissions c
          JOIN nclms_marketing_agents a ON a.id = c.agent_id
          JOIN nclms_users u ON u.id = a.user_id
@@ -141,21 +141,18 @@ adminRouter.post(
   '/:id/mark-paid',
   proofUpload.single('proof'),
   async (req, res, next) => {
-    let savedPath: string | null = null;
     try {
       const auth = (req as AuthedRequest).user!;
       const reference = (req.body as { reference?: string }).reference;
       const file = req.file;
-      if (file) savedPath = file.path;
 
       const row = await markPaid(req.params.id!, {
         reference,
         proof: file
-          ? { filePath: file.path, fileName: file.originalname, mimeType: file.mimetype }
+          ? { content: file.buffer, fileName: file.originalname, mimeType: file.mimetype }
           : null,
       });
       if (!row) {
-        if (savedPath) await unlink(savedPath).catch(() => undefined);
         res.status(409).json({ error: 'conflict', message: 'Commission is not pending/requested or does not exist.' });
         return;
       }
@@ -184,7 +181,6 @@ adminRouter.post(
       }
       res.json(row);
     } catch (err) {
-      if (savedPath) await unlink(savedPath).catch(() => undefined);
       next(err);
     }
   },
@@ -214,20 +210,18 @@ adminRouter.post('/:id/cancel', async (req, res, next) => {
   }
 });
 
-// Admin downloads / views a commission's proof file.
+// Admin downloads / views a commission's proof file (served from DB).
 adminRouter.get('/:id/proof', async (req, res, next) => {
   try {
-    const row = await getCommissionById(req.params.id!);
-    if (!row || !row.proof_file_path) throw notFound('No proof of payment uploaded.');
-    const absolute = resolve(row.proof_file_path);
+    const proof = await getCommissionProof(req.params.id!);
+    if (!proof) throw notFound('No proof of payment uploaded.');
     const inline = req.query.inline === '1' || req.query.inline === 'true';
-    if (inline) {
-      if (row.proof_mime_type) res.setHeader('Content-Type', row.proof_mime_type);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.proof_file_name ?? 'proof')}"`);
-      res.sendFile(absolute);
-    } else {
-      res.download(absolute, row.proof_file_name ?? 'proof');
-    }
+    if (proof.mimeType) res.setHeader('Content-Type', proof.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(proof.fileName ?? 'proof')}"`,
+    );
+    res.send(proof.content);
   } catch (err) {
     next(err);
   }
