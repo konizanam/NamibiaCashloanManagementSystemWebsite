@@ -367,6 +367,63 @@ export const openapiSpec = {
         responses: { '200': { description: 'Updated' } },
       },
     },
+    '/api/applications/resubmit/{token}': {
+      get: {
+        tags: ['Applications'],
+        summary: 'Load an application for editing (public, requires resubmit token)',
+        description:
+          'Returns the current application data + existing documents so the public edit form can be prefilled. Only works while status = requires_info.',
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Application + documents + recent admin messages' },
+          '401': { description: 'Token invalid or expired' },
+          '404': { description: 'Application not found' },
+          '409': { description: 'Application is not in requires_info status' },
+        },
+      },
+      post: {
+        tags: ['Applications'],
+        summary: 'Submit field updates and additional documents (public, requires resubmit token)',
+        description:
+          'Multipart form. Any field set in the body is updated; any uploaded file is appended to the document list. Status returns to pending on success.',
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: false,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                properties: {
+                  business_name: { type: 'string' },
+                  namfisa_reg_no: { type: 'string' },
+                  business_type: { type: 'string' },
+                  physical_address: { type: 'string' },
+                  city: { type: 'string' },
+                  country: { type: 'string' },
+                  business_phone: { type: 'string' },
+                  business_email: { type: 'string', format: 'email' },
+                  principal_officer_name: { type: 'string' },
+                  principal_officer_id_number: { type: 'string' },
+                  principal_officer_phone: { type: 'string' },
+                  principal_officer_email: { type: 'string', format: 'email' },
+                  preferred_tier: { type: 'string', enum: ['tier1', 'tier2', 'tier3', 'tier4'] },
+                  founding_statement: { type: 'string', format: 'binary' },
+                  namfisa_certificate: { type: 'string', format: 'binary' },
+                  namfisa_approval_letter: { type: 'string', format: 'binary' },
+                  principal_officer_id: { type: 'string', format: 'binary' },
+                  business_registration: { type: 'array', items: { type: 'string', format: 'binary' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Resubmitted; status returned to pending' },
+          '401': { description: 'Token invalid or expired' },
+          '409': { description: 'Application is not in requires_info status' },
+        },
+      },
+    },
     '/api/applications/{id}/messages': {
       get: {
         tags: ['Application Messages'],

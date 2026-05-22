@@ -113,12 +113,23 @@ export async function sendApplicationRejectedEmail(app: ApplicationRow, reason: 
 // ---------------------------------------------------------------------------
 export async function sendApplicantNoteEmail(
   app: ApplicationRow,
-  opts: { subject?: string; body: string; isInfoRequest?: boolean },
+  opts: { subject?: string; body: string; isInfoRequest?: boolean; resubmitUrl?: string },
 ): Promise<{ sent: boolean; to: string }> {
   const subjectLine = opts.subject?.trim()
     || (opts.isInfoRequest ? 'NCLMS — more information needed for your application' : 'NCLMS — message about your application');
   const banner = opts.isInfoRequest
     ? `<div style="background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:6px;font-weight:600;font-size:13px;margin-bottom:14px;">More information required to continue your review</div>`
+    : '';
+  const resubmitCta = opts.resubmitUrl
+    ? `
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(opts.resubmitUrl)}"
+           style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:8px;">
+          Update &amp; resubmit your application →
+        </a>
+      </p>
+      <p style="color:#475569;font-size:12.5px;">This link is valid for 3 days. It lets you edit your application details and upload any additional documents we've asked for.</p>
+    `
     : '';
   const html = wrapHtml(
     subjectLine,
@@ -130,7 +141,8 @@ export async function sendApplicantNoteEmail(
       <div style="margin:14px 0;padding:14px 16px;background:#f8fafc;border-left:3px solid #16a34a;border-radius:4px;font-size:13.5px;">
         ${paragraphsToHtml(opts.body)}
       </div>
-      <p>Please reply to this email with anything we've asked for and we'll continue your review.</p>
+      ${resubmitCta}
+      <p>If you have questions you can also reply directly to this email.</p>
       <p style="color:#475569;font-size:12.5px;">Application reference: <code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(app.id)}</code></p>
     `,
   );

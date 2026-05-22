@@ -6,6 +6,7 @@ import { Features } from './pages/Features';
 import { Pricing } from './pages/Pricing';
 import { Contact } from './pages/Contact';
 import { Apply } from './pages/Apply';
+import { ApplyEdit } from './pages/ApplyEdit';
 import { ApplySuccess } from './pages/ApplySuccess';
 import { Login } from './pages/Login';
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/apply" element={<Apply />} />
+        <Route path="/apply/edit/:token" element={<ApplyEdit />} />
         <Route path="/apply/success" element={<ApplySuccess />} />
         <Route path="/login" element={<Login />} />
         {/* Legacy admin login URL */}

@@ -1,6 +1,8 @@
 import { pool } from '../db.js';
 import { notFound } from '../lib/errors.js';
 import { sendApplicantNoteEmail } from './notificationService.js';
+import { signResubmitToken } from '../lib/jwt.js';
+import { config } from '../config.js';
 import type { ApplicationRow } from './applicationService.js';
 
 export interface ApplicationMessageRow {
@@ -48,10 +50,14 @@ export async function createMessage(
 
   let emailResult: { sent: boolean; to: string } = { sent: false, to: '' };
   if (input.sendEmail) {
+    const resubmitUrl = input.isInfoRequest
+      ? `${config.appBaseUrl.replace(/\/$/, '')}/apply/edit/${signResubmitToken(app.id)}`
+      : undefined;
     emailResult = await sendApplicantNoteEmail(app, {
       subject: input.subject,
       body: input.body,
       isInfoRequest: input.isInfoRequest,
+      resubmitUrl,
     });
   }
 
