@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Feature = ({ title, body, color }: { title: string; body: string; color: string }) => (
   <div className={`card-hover p-6 border-t-4 ${color}`}>
@@ -8,6 +9,11 @@ const Feature = ({ title, body, color }: { title: string; body: string; color: s
 );
 
 export const Home = () => {
+  usePageMeta({
+    title: 'Cash loan management for Namibian microlenders',
+    description: 'NAMFISA-ready loan management software. Manage clients, loans, repayments and compliance in one secure cloud platform — from N$1,000/month, hosting included.',
+    canonicalPath: '/',
+  });
   return (
     <>
       {/* Hero */}

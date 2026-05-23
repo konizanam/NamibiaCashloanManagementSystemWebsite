@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 interface TierCard {
   name: string;
@@ -96,7 +97,13 @@ const ENHANCEMENT_EXCLUSIONS: string[] = [
   'Regulatory, legal, or accounting advice',
 ];
 
-export const Pricing = () => (
+export const Pricing = () => {
+  usePageMeta({
+    title: 'Pricing',
+    description: 'Tiered NCLMS pricing for Namibian microlenders. From N$1,000 per month (Tier 1) to enterprise. All plans include hosting, NAMFISA reporting, audit trail, email notifications and updates.',
+    canonicalPath: '/pricing',
+  });
+  return (
   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
     {/* Header */}
     <div className="text-center">
@@ -275,4 +282,5 @@ export const Pricing = () => (
       *Fair-use policy applies on Enterprise. All pricing in N$ and excludes VAT.
     </p>
   </div>
-);
+  );
+};

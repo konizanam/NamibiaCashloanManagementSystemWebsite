@@ -1,3 +1,5 @@
+import { usePageMeta } from '../hooks/usePageMeta';
+
 const Group = ({ title, items }: { title: string; items: string[] }) => (
   <div className="card p-6">
     <div className="font-bold text-brand-navy">{title}</div>
@@ -9,7 +11,13 @@ const Group = ({ title, items }: { title: string; items: string[] }) => (
   </div>
 );
 
-export const Features = () => (
+export const Features = () => {
+  usePageMeta({
+    title: 'Features',
+    description: 'Client and loan management, repayment scheduling, interest configuration, auto-generated contracts with e-signatures, role-based access, NAMFISA-aligned reporting, and a full audit trail.',
+    canonicalPath: '/features',
+  });
+  return (
   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
     <div className="text-center">
       <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Features</div>
@@ -51,4 +59,5 @@ export const Features = () => (
       ]} />
     </div>
   </div>
-);
+  );
+};

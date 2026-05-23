@@ -5,6 +5,7 @@ import { FileDrop } from '../components/FileDrop';
 import { CityAutocomplete } from '../components/CityAutocomplete';
 import { TierPicker } from '../components/TierPicker';
 import { checkAvailability, submitApplication, validateReferral } from '../api/applications';
+import { usePageMeta } from '../hooks/usePageMeta';
 import type { ApiError } from '../api/client';
 import type { Tier } from '../api/types';
 
@@ -61,6 +62,11 @@ const initialFiles: FileState = {
 const STEPS = ['Business', 'Officer', 'Plan', 'Documents'] as const;
 
 export const Apply = () => {
+  usePageMeta({
+    title: 'Apply Online',
+    description: 'Apply to onboard your Namibian microlending business onto NCLMS. Submit business details, upload your NAMFISA documents, and pick a plan in a few minutes.',
+    canonicalPath: '/apply',
+  });
   const nav = useNavigate();
   const [form, setForm] = useState<FormState>(initialForm);
   const [files, setFiles] = useState<FileState>(initialFiles);

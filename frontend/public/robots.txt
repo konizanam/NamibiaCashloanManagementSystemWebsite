@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+
+# Authenticated app surfaces — never indexable.
+Disallow: /admin
+Disallow: /agent
+Disallow: /portal
+Disallow: /login
+Disallow: /login/verify
+Disallow: /change-password
+Disallow: /reset-password/
+Disallow: /forgot-password
+Disallow: /account/
+
+# Internal / API.
+Disallow: /api/
+Disallow: /docs
+Disallow: /openapi.json
+Disallow: /uploads/
+
+# Application-specific edit links (signed tokens, unique per applicant).
+Disallow: /apply/edit/
+
+Sitemap: https://nclms.konizanam.com/sitemap.xml

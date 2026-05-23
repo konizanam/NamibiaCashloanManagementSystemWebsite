@@ -1,4 +1,12 @@
-export const About = () => (
+import { usePageMeta } from '../hooks/usePageMeta';
+
+export const About = () => {
+  usePageMeta({
+    title: 'About NCLMS',
+    description: 'Built by Koniza Information Technology for Namibian microlenders. End-to-end loan management, NAMFISA-aligned reporting, secure cloud hosting included.',
+    canonicalPath: '/about',
+  });
+  return (
   <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
     <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">About NCLMS</div>
     <h1 className="text-4xl font-extrabold text-brand-navy mt-2">Built for Namibian microlenders.</h1>
@@ -36,4 +44,5 @@ export const About = () => (
       </p>
     </div>
   </div>
-);
+  );
+};

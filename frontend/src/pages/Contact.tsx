@@ -1,4 +1,12 @@
-export const Contact = () => (
+import { usePageMeta } from '../hooks/usePageMeta';
+
+export const Contact = () => {
+  usePageMeta({
+    title: 'Contact Koniza',
+    description: 'Talk to Koniza about onboarding, tier selection, or a custom enhancement for the NCLMS cash loan management system. Based in Windhoek, Namibia.',
+    canonicalPath: '/contact',
+  });
+  return (
   <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
     <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Contact</div>
     <h1 className="text-4xl font-extrabold text-brand-navy mt-2">Get in touch with Koniza.</h1>
@@ -32,4 +40,5 @@ export const Contact = () => (
       <a href="/apply" className="btn-primary mt-3 inline-flex">Apply Online →</a>
     </div>
   </div>
-);
+  );
+};
