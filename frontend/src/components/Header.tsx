@@ -79,23 +79,16 @@ export const Header = () => {
             </NavLink>
           ))}
           <DemoButton />
-          {user ? (
+          {user && (
             <NavLink
-              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/'}
+              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/portal'}
               className={({ isActive }) =>
                 `ml-1 px-3 py-2 rounded-lg text-sm font-semibold ${
                   isActive ? 'bg-white text-brand-green-dark' : 'text-white/90 hover:bg-white/10'
                 }`
               }
             >
-              {user.role === 'admin' ? 'Admin' : user.role === 'marketing_agent' ? 'Agent' : 'Account'}
-            </NavLink>
-          ) : (
-            <NavLink
-              to="/login"
-              className="ml-1 px-3 py-2 rounded-lg text-sm font-semibold text-white/90 hover:bg-white/10"
-            >
-              Sign in
+              {user.role === 'admin' ? 'Admin' : user.role === 'marketing_agent' ? 'Agent' : 'My account'}
             </NavLink>
           )}
         </nav>
@@ -144,9 +137,9 @@ export const Header = () => {
               {item.label}
             </NavLink>
           ))}
-          {user ? (
+          {user && (
             <NavLink
-              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/'}
+              to={user.role === 'admin' ? '/admin' : user.role === 'marketing_agent' ? '/agent' : '/portal'}
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 `block px-3 py-3 rounded-lg text-sm font-semibold ${
@@ -155,14 +148,6 @@ export const Header = () => {
               }
             >
               {user.role === 'admin' ? 'Admin Dashboard' : user.role === 'marketing_agent' ? 'Agent Dashboard' : 'My account'}
-            </NavLink>
-          ) : (
-            <NavLink
-              to="/login"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-3 rounded-lg text-sm font-semibold text-white/90 hover:bg-white/10"
-            >
-              Sign in
             </NavLink>
           )}
           <div className="pt-3 mt-2 border-t border-white/10">
