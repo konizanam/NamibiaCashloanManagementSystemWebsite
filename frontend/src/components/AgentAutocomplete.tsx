@@ -68,8 +68,10 @@ export const AgentAutocomplete = ({
     setOpen(false);
   };
 
+  const showHint = query.trim().length > 0 && query.trim().length < MIN_CHARS;
+
   return (
-    <div ref={wrapRef} className="min-w-[260px] flex-1">
+    <div ref={wrapRef} className="w-full sm:w-72">
       <label htmlFor={inputId} className="field-label">{label}</label>
       <div className="relative">
         <input
@@ -84,9 +86,7 @@ export const AgentAutocomplete = ({
             setQuery(v);
             setOpen(true);
             setActive(0);
-            // If the user clears the input, drop the filter.
             if (v.trim().length === 0 && value) onChange('');
-            // If the user edits past a selected match, drop the filter too.
             if (value && selected && v !== displayName(selected)) onChange('');
           }}
           onFocus={() => { if (matches.length > 0) setOpen(true); }}
@@ -108,6 +108,14 @@ export const AgentAutocomplete = ({
           >
             ✕
           </button>
+        )}
+
+        {/* The hint is positioned absolutely so it doesn't change the
+            element's height and the filter row stays aligned. */}
+        {showHint && (
+          <div className="absolute left-0 top-full mt-1 text-xs text-slate-500">
+            Type at least {MIN_CHARS} characters
+          </div>
         )}
 
         {open && matches.length > 0 && (
@@ -134,17 +142,6 @@ export const AgentAutocomplete = ({
             ))}
           </ul>
         )}
-      </div>
-      <div className="field-help">
-        {query.trim().length === 0
-          ? 'All agents.'
-          : query.trim().length < MIN_CHARS
-          ? `Type at least ${MIN_CHARS} characters to see suggestions.`
-          : matches.length === 0
-          ? 'No matches.'
-          : value
-          ? 'Filter applied.'
-          : 'Pick a suggestion.'}
       </div>
     </div>
   );
