@@ -8,6 +8,7 @@ import {
 import { getToken } from '../../api/client';
 import { listAgents } from '../../api/marketingAgents';
 import { PromptModal } from '../../components/PromptModal';
+import { AgentAutocomplete } from '../../components/AgentAutocomplete';
 import type { Commission, CommissionStatus, CommissionType, MarketingAgent, Paginated } from '../../api/types';
 
 const fmtNAD = (n: number | string) =>
@@ -210,17 +211,7 @@ export const AdminCommissions = () => {
       </div>
 
       <div className="card p-4 mt-4 flex flex-wrap gap-3 items-end">
-        <div className="min-w-[200px] flex-1">
-          <label className="field-label">Agent</label>
-          <select className="field-input" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            <option value="">All agents</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.full_name} ({a.referral_code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AgentAutocomplete agents={agents} value={agentId} onChange={setAgentId} />
         <div>
           <label className="field-label">Status</label>
           <select className="field-input" value={status} onChange={(e) => setStatus(e.target.value as CommissionStatus | '')}>
