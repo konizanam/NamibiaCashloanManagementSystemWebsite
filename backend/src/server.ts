@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { apiReference } from '@scalar/express-api-reference';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { config } from './config.js';
@@ -68,6 +69,32 @@ app.use('/api/admin/commissions', commissionsRouter);
 app.use('/api/applications/resubmit', resubmitRouter);
 app.use('/api/microlender', microlenderRouter);
 app.use('/api/microlenders', microlendersRouter);
+
+// ---------------------------------------------------------------------------
+// Serve the built React frontend (Vite's `frontend/dist` output) so the
+// API service can host the SPA as well. The frontend's API client uses
+// relative paths, so once they're on the same origin everything just works.
+// ---------------------------------------------------------------------------
+const frontendDir = resolve(__dirname, '..', '..', 'frontend', 'dist');
+if (existsSync(frontendDir)) {
+  app.use(express.static(frontendDir));
+
+  // SPA fallback — any GET that didn't match an API/docs/uploads route serves
+  // index.html so React Router can take it from there.
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api/') ||
+      req.path.startsWith('/docs') ||
+      req.path === '/openapi.json' ||
+      req.path.startsWith('/uploads/')
+    ) {
+      return next();
+    }
+    res.sendFile(resolve(frontendDir, 'index.html'));
+  });
+} else {
+  console.warn(`[startup] frontend/dist not found at ${frontendDir} — serving API only.`);
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);
