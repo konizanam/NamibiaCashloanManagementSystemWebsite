@@ -4,7 +4,7 @@ import { TextField, TextAreaField, SelectField } from '../components/Field';
 import { FileDrop } from '../components/FileDrop';
 import { CityAutocomplete } from '../components/CityAutocomplete';
 import { TierPicker } from '../components/TierPicker';
-import { submitApplication, validateReferral } from '../api/applications';
+import { checkAvailability, submitApplication, validateReferral } from '../api/applications';
 import type { ApiError } from '../api/client';
 import type { Tier } from '../api/types';
 
@@ -69,6 +69,11 @@ export const Apply = () => {
   const [error, setError] = useState<string | null>(null);
   const [referralCheck, setReferralCheck] = useState<{ valid: boolean; agentName?: string } | null>(null);
 
+  // Live availability checks for namfisa_reg_no + business_email.
+  type Avail = { state: 'idle' | 'checking' | 'available' | 'taken'; reason?: string };
+  const [namfisaAvail, setNamfisaAvail] = useState<Avail>({ state: 'idle' });
+  const [emailAvail, setEmailAvail] = useState<Avail>({ state: 'idle' });
+
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -85,6 +90,44 @@ export const Apply = () => {
     }, 400);
     return () => clearTimeout(t);
   }, [form.referral_code]);
+
+  // Debounced live availability check for the NAMFISA Reg No.
+  useEffect(() => {
+    const v = form.namfisa_reg_no.trim();
+    if (v.length < 3) { setNamfisaAvail({ state: 'idle' }); return; }
+    setNamfisaAvail({ state: 'checking' });
+    const t = setTimeout(() => {
+      checkAvailability({ namfisa_reg_no: v })
+        .then((r) => {
+          const c = r.namfisa_reg_no;
+          if (!c) { setNamfisaAvail({ state: 'idle' }); return; }
+          setNamfisaAvail(c.available
+            ? { state: 'available' }
+            : { state: 'taken', reason: c.reason });
+        })
+        .catch(() => setNamfisaAvail({ state: 'idle' }));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [form.namfisa_reg_no]);
+
+  // Debounced live availability check for the business email.
+  useEffect(() => {
+    const v = form.business_email.trim();
+    if (!v.includes('@') || v.length < 5) { setEmailAvail({ state: 'idle' }); return; }
+    setEmailAvail({ state: 'checking' });
+    const t = setTimeout(() => {
+      checkAvailability({ business_email: v })
+        .then((r) => {
+          const c = r.business_email;
+          if (!c) { setEmailAvail({ state: 'idle' }); return; }
+          setEmailAvail(c.available
+            ? { state: 'available' }
+            : { state: 'taken', reason: c.reason });
+        })
+        .catch(() => setEmailAvail({ state: 'idle' }));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [form.business_email]);
 
   const submit = async () => {
     setSubmitting(true);
@@ -120,7 +163,11 @@ export const Apply = () => {
     form.city.trim() &&
     form.country.trim() &&
     form.business_phone.trim() &&
-    form.business_email.includes('@');
+    form.business_email.includes('@') &&
+    namfisaAvail.state !== 'taken' &&
+    namfisaAvail.state !== 'checking' &&
+    emailAvail.state !== 'taken' &&
+    emailAvail.state !== 'checking';
 
   const canStep2 =
     form.principal_officer_name.trim() &&
@@ -173,9 +220,19 @@ export const Apply = () => {
             <TextField label="Business name" required value={form.business_name}
               onChange={(e) => setField('business_name', e.target.value)} name="business_name" />
 
-            <TextField label="NAMFISA Reg No" required value={form.namfisa_reg_no}
-              onChange={(e) => setField('namfisa_reg_no', e.target.value)} name="namfisa_reg_no"
-              help="Your registration number issued by NAMFISA." />
+            <TextField
+              label="NAMFISA Reg No"
+              required
+              value={form.namfisa_reg_no}
+              onChange={(e) => setField('namfisa_reg_no', e.target.value)}
+              name="namfisa_reg_no"
+              help={
+                namfisaAvail.state === 'checking' ? 'Checking…' :
+                namfisaAvail.state === 'available' ? '✓ Available — no existing application or microlender uses this number.' :
+                'Your registration number issued by NAMFISA.'
+              }
+              error={namfisaAvail.state === 'taken' ? namfisaAvail.reason ?? 'Already in use.' : undefined}
+            />
 
             <SelectField label="Business type" required value={form.business_type}
               onChange={(e) => setField('business_type', e.target.value)} name="business_type"
@@ -203,9 +260,20 @@ export const Apply = () => {
               help="Primary business contact number." />
 
             <div className="md:col-span-2">
-              <TextField label="Business email" required type="email" value={form.business_email}
+              <TextField
+                label="Business email"
+                required
+                type="email"
+                value={form.business_email}
                 onChange={(e) => setField('business_email', e.target.value)}
-                help="Used as the login email once approved." name="business_email" />
+                help={
+                  emailAvail.state === 'checking' ? 'Checking…' :
+                  emailAvail.state === 'available' ? '✓ Available — no existing account or application uses this email.' :
+                  'Used as the login email once approved.'
+                }
+                error={emailAvail.state === 'taken' ? emailAvail.reason ?? 'Already in use.' : undefined}
+                name="business_email"
+              />
             </div>
 
             <div className="md:col-span-2">

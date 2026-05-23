@@ -67,3 +67,15 @@ export const validateReferral = (code: string) =>
     `/api/referrals/validate?code=${encodeURIComponent(code)}`,
     { auth: false },
   );
+
+export interface AvailabilityResult {
+  namfisa_reg_no?: { available: boolean; reason?: string };
+  business_email?: { available: boolean; reason?: string };
+}
+
+export const checkAvailability = (input: { namfisa_reg_no?: string; business_email?: string }) => {
+  const qs = new URLSearchParams();
+  if (input.namfisa_reg_no) qs.set('namfisa_reg_no', input.namfisa_reg_no);
+  if (input.business_email) qs.set('business_email', input.business_email);
+  return api<AvailabilityResult>(`/api/applications/check-availability?${qs.toString()}`, { auth: false });
+};

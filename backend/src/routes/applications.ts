@@ -127,6 +127,67 @@ applicationsRouter.get(
   },
 );
 
+// Public — check whether a NAMFISA Reg No and/or business email are already
+// taken by a live application or an approved microlender. Used by the public
+// Apply form for inline availability hints before submit.
+applicationsRouter.get('/check-availability', async (req, res, next) => {
+  try {
+    const namfisa = typeof req.query.namfisa_reg_no === 'string' ? req.query.namfisa_reg_no.trim() : '';
+    const emailRaw = typeof req.query.business_email === 'string' ? req.query.business_email.trim() : '';
+    const email = emailRaw.toLowerCase();
+
+    const out: Record<string, { available: boolean; reason?: string }> = {};
+
+    if (namfisa) {
+      const { rows: dupApp } = await pool.query<{ status: string }>(
+        `SELECT status FROM nclms_microlender_applications
+          WHERE status IN ('pending','requires_info','approved') AND namfisa_reg_no = $1
+          LIMIT 1`,
+        [namfisa],
+      );
+      const { rows: dupMl } = await pool.query<{ id: string }>(
+        `SELECT id FROM nclms_microlenders WHERE namfisa_reg_no = $1 LIMIT 1`,
+        [namfisa],
+      );
+      const available = dupApp.length === 0 && dupMl.length === 0;
+      out.namfisa_reg_no = {
+        available,
+        ...(available ? {} : {
+          reason: dupMl.length > 0
+            ? 'This NAMFISA Reg No is already registered as an active microlender.'
+            : `This NAMFISA Reg No is already on a ${dupApp[0]!.status.replace('_', ' ')} application.`,
+        }),
+      };
+    }
+
+    if (email) {
+      const { rows: dupApp } = await pool.query<{ status: string }>(
+        `SELECT status FROM nclms_microlender_applications
+          WHERE status IN ('pending','requires_info','approved') AND business_email = $1
+          LIMIT 1`,
+        [email],
+      );
+      const { rows: dupUser } = await pool.query<{ role: string }>(
+        `SELECT role FROM nclms_users WHERE email = $1 LIMIT 1`,
+        [email],
+      );
+      const available = dupApp.length === 0 && dupUser.length === 0;
+      out.business_email = {
+        available,
+        ...(available ? {} : {
+          reason: dupUser.length > 0
+            ? 'This email already belongs to an existing NCLMS account.'
+            : `This email is already on a ${dupApp[0]!.status.replace('_', ' ')} application.`,
+        }),
+      };
+    }
+
+    res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Admin — detail
 applicationsRouter.get('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
