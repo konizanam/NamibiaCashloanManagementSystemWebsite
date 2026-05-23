@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { TextField } from '../components/Field';
+import { PasswordStrength, isPasswordValid } from '../components/PasswordStrength';
 import { changePassword } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import type { ApiError } from '../api/client';
@@ -25,7 +26,7 @@ export const ChangePassword = () => {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (next.length < 8) { setErr('New password must be at least 8 characters.'); return; }
+    if (!isPasswordValid(next)) { setErr('Password does not meet the policy below.'); return; }
     if (next !== confirm) { setErr('New password and confirmation don\'t match.'); return; }
     setBusy(true);
     try {
@@ -58,14 +59,18 @@ export const ChangePassword = () => {
           </p>
 
           <form className="card p-6 mt-6 space-y-5" onSubmit={submit}>
-            <TextField label="Current (temporary) password" type="password" required autoFocus
+            <TextField label="Current (temporary) password" type="password" required autoFocus autoComplete="current-password"
               value={current} onChange={(e) => setCurrent(e.target.value)} name="current" />
-            <TextField label="New password" type="password" required
-              value={next} onChange={(e) => setNext(e.target.value)} name="next" />
-            <TextField label="Confirm new password" type="password" required
-              value={confirm} onChange={(e) => setConfirm(e.target.value)} name="confirm" />
+            <div>
+              <TextField label="New password" type="password" required autoComplete="new-password"
+                value={next} onChange={(e) => setNext(e.target.value)} name="next" />
+              <PasswordStrength password={next} />
+            </div>
+            <TextField label="Confirm new password" type="password" required autoComplete="new-password"
+              value={confirm} onChange={(e) => setConfirm(e.target.value)} name="confirm"
+              error={confirm.length > 0 && confirm !== next ? 'Passwords don\'t match' : undefined} />
             {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
-            <button className="btn-primary w-full" disabled={busy}>
+            <button className="btn-primary w-full" disabled={busy || !isPasswordValid(next) || next !== confirm}>
               {busy ? 'Updating…' : 'Set new password'}
             </button>
           </form>

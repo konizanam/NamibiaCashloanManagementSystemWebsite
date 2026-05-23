@@ -6,6 +6,7 @@ import {
   type CreateAdminMicrolenderInput,
 } from '../../api/adminMicrolenders';
 import { CityAutocomplete } from '../../components/CityAutocomplete';
+import { PasswordStrength, isPasswordValid } from '../../components/PasswordStrength';
 import type { AdminMicrolenderList, Paginated, Tier, UserStatus } from '../../api/types';
 
 const TIER_LABEL: Record<Tier, string> = {
@@ -191,7 +192,7 @@ const CreateMicrolenderModal = ({ onClose, onCreated }: { onClose: () => void; o
     form.city.trim() &&
     form.business_email.includes('@') &&
     form.full_name.trim() &&
-    (form.password?.length ?? 0) >= 8;
+    isPasswordValid(form.password ?? '');
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
@@ -247,9 +248,11 @@ const CreateMicrolenderModal = ({ onClose, onCreated }: { onClose: () => void; o
             <label className="field-label">Login email *</label>
             <input type="email" className="field-input" value={form.business_email} onChange={(e) => setField('business_email', e.target.value)} />
           </div>
-          <div>
-            <label className="field-label">Temporary password * (min 8)</label>
+          <div className="sm:col-span-2">
+            <label className="field-label">Temporary password *</label>
             <input type="text" className="field-input" value={form.password} onChange={(e) => setField('password', e.target.value)} />
+            <PasswordStrength password={form.password} />
+            <div className="field-help">Microlender will be forced to change on first sign-in.</div>
           </div>
           <div>
             <label className="field-label">Tier</label>

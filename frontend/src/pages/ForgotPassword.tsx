@@ -4,6 +4,13 @@ import { forgotPassword } from '../api/auth';
 import { TextField } from '../components/Field';
 import type { ApiError } from '../api/client';
 
+const maskEmail = (email: string): string => {
+  const [name, domain] = email.split('@');
+  if (!name || !domain) return email;
+  const head = name.slice(0, 2);
+  return `${head}${'*'.repeat(Math.max(name.length - 2, 1))}@${domain}`;
+};
+
 export const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,7 +42,7 @@ export const ForgotPassword = () => {
         <div className="card p-7 mt-8">
           <div className="font-bold text-brand-navy">Check your inbox</div>
           <p className="text-sm text-slate-600 mt-2">
-            If <strong>{email}</strong> matches an NCLMS account, you'll receive a reset email within a minute. The link is good for one hour.
+            If <strong>{maskEmail(email)}</strong> matches an NCLMS account, you'll receive a reset email within a minute. The link is good for one hour.
           </p>
           <div className="mt-4 text-sm">
             <Link to="/login" className="text-brand-green-dark font-semibold hover:underline">← Back to sign in</Link>

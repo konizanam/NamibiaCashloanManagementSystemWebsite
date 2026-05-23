@@ -8,6 +8,7 @@ import {
 } from '../lib/jwt.js';
 import { unauthorized, badRequest, notFound } from '../lib/errors.js';
 import { generateOtp, generateResetToken, sha256Hex } from '../lib/codes.js';
+import { enforcePasswordPolicy } from '../lib/passwordPolicy.js';
 import {
   sendTwoFactorCodeEmail,
   sendPasswordResetEmail,
@@ -84,27 +85,14 @@ export const login = async (email: string, password: string): Promise<LoginResul
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) throw unauthorized('Invalid email or password');
 
-  if (user.two_factor_enabled) {
-    await issueOtp(user.id, user.email, user.full_name);
-    return {
-      requires_2fa: true,
-      challenge_token: signTwoFactorChallenge(user.id),
-      email_masked: maskEmail(user.email),
-    };
-  }
-
-  await pool.query(`UPDATE nclms_users SET last_login_at = NOW() WHERE id = $1`, [user.id]);
-  const token = signAuthToken({ sub: user.id, email: user.email, role: user.role });
+  // Two-factor authentication is mandatory for every NCLMS account. After a
+  // successful password check we always issue an email OTP and require the
+  // user to enter it before we hand out a real auth token.
+  await issueOtp(user.id, user.email, user.full_name);
   return {
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      full_name: user.full_name,
-      role: user.role,
-      must_change_password: user.must_change_password,
-      two_factor_enabled: user.two_factor_enabled,
-    },
+    requires_2fa: true,
+    challenge_token: signTwoFactorChallenge(user.id),
+    email_masked: maskEmail(user.email),
   };
 };
 
@@ -126,17 +114,6 @@ export const verifyTwoFactor = async (
   const user = rows[0];
   if (!user) throw unauthorized('Account not found');
   if (user.status !== 'active') throw unauthorized('Account is not active');
-  if (!user.two_factor_enabled) {
-    // 2FA was turned off after the challenge was issued — just authorise.
-    const token = signAuthToken({ sub: user.id, email: user.email, role: user.role });
-    return {
-      token,
-      user: {
-        id: user.id, email: user.email, full_name: user.full_name, role: user.role,
-        must_change_password: user.must_change_password, two_factor_enabled: false,
-      },
-    };
-  }
 
   if (!user.two_factor_code_hash || !user.two_factor_code_expires_at) {
     throw unauthorized('No verification code on file. Please sign in again.');
@@ -185,12 +162,12 @@ export const resendTwoFactor = async (challengeToken: string): Promise<{ email_m
   let payload;
   try { payload = verifyTwoFactorChallenge(challengeToken); }
   catch { throw unauthorized('Verification code expired. Please sign in again.'); }
-  const { rows } = await pool.query<{ id: string; email: string; full_name: string; status: string; two_factor_enabled: boolean }>(
-    `SELECT id, email, full_name, status, two_factor_enabled FROM nclms_users WHERE id = $1`,
+  const { rows } = await pool.query<{ id: string; email: string; full_name: string; status: string }>(
+    `SELECT id, email, full_name, status FROM nclms_users WHERE id = $1`,
     [payload.sub],
   );
   const u = rows[0];
-  if (!u || u.status !== 'active' || !u.two_factor_enabled) throw unauthorized('Cannot resend.');
+  if (!u || u.status !== 'active') throw unauthorized('Cannot resend.');
   await issueOtp(u.id, u.email, u.full_name);
   return { email_masked: maskEmail(u.email) };
 };
@@ -217,7 +194,7 @@ export const changePassword = async (
   currentPassword: string,
   newPassword: string,
 ): Promise<void> => {
-  if (newPassword.length < 8) throw badRequest('New password must be at least 8 characters.');
+  enforcePasswordPolicy(newPassword);
   if (newPassword === currentPassword) {
     throw badRequest('New password must be different from your current one.');
   }
@@ -321,7 +298,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 };
 
 export const resetPasswordWithToken = async (token: string, newPassword: string): Promise<void> => {
-  if (newPassword.length < 8) throw badRequest('New password must be at least 8 characters.');
+  enforcePasswordPolicy(newPassword);
   const hash = sha256Hex(token);
   const { rows } = await pool.query<{ id: string; password_reset_expires_at: Date | null }>(
     `SELECT id, password_reset_expires_at FROM nclms_users WHERE password_reset_token_hash = $1`,

@@ -3,6 +3,7 @@ import { pool, withTransaction } from '../db.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { generateReferralCode } from '../lib/referralCode.js';
 import { sendAgentWelcomeEmail } from './notificationService.js';
+import { enforcePasswordPolicy } from '../lib/passwordPolicy.js';
 import type {
   CreateMarketingAgentInput,
 } from '../schemas/marketingAgent.js';
@@ -32,6 +33,7 @@ const SELECT_AGENT = `
 export const createMarketingAgent = async (
   input: CreateMarketingAgentInput,
 ): Promise<MarketingAgentRow> => {
+  enforcePasswordPolicy(input.password);
   const agent = await withTransaction(async (client) => {
     const { rows: existing } = await client.query<{ id: string; role: string }>(
       `SELECT id, role FROM nclms_users WHERE email = $1`,

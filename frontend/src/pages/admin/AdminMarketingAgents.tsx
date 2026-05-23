@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createAgent, listAgents, updateAgent } from '../../api/marketingAgents';
 import type { MarketingAgent } from '../../api/types';
 import { TextField, TextAreaField } from '../../components/Field';
+import { PasswordStrength, isPasswordValid } from '../../components/PasswordStrength';
 
 export const AdminMarketingAgents = () => {
   const [agents, setAgents] = useState<MarketingAgent[]>([]);
@@ -114,7 +115,8 @@ export const AdminMarketingAgents = () => {
               <div className="sm:col-span-2">
                 <TextField label="Temporary password" required type="text" value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  help="Min 8 characters. Agent should change on first sign-in." name="password" />
+                  help="Agent will be forced to change on first sign-in." name="password" />
+                <PasswordStrength password={form.password} />
               </div>
               <div className="sm:col-span-2">
                 <TextAreaField label="Notes" value={form.notes}
@@ -128,7 +130,7 @@ export const AdminMarketingAgents = () => {
             {err && <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn-outline" onClick={() => setShowCreate(false)} disabled={busy}>Cancel</button>
-              <button className="btn-primary" disabled={busy || !form.full_name || !form.email || form.password.length < 8} onClick={submit}>
+              <button className="btn-primary" disabled={busy || !form.full_name || !form.email || !isPasswordValid(form.password)} onClick={submit}>
                 {busy ? 'Creating…' : 'Create agent'}
               </button>
             </div>

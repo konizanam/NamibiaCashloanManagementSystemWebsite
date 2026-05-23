@@ -2,12 +2,8 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { TextField } from '../components/Field';
-import { PromptModal } from '../components/PromptModal';
-import {
-  changePassword as changePasswordApi,
-  disableTwoFactor as disableTwoFactorApi,
-  enableTwoFactor as enableTwoFactorApi,
-} from '../api/auth';
+import { PasswordStrength, isPasswordValid } from '../components/PasswordStrength';
+import { changePassword as changePasswordApi } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import type { ApiError } from '../api/client';
 import type { Role } from '../api/types';
@@ -21,9 +17,7 @@ const HOMES: Record<Role, string> = {
 export const AccountSecurity = () => {
   const { user, refresh, logout } = useAuth();
   const nav = useNavigate();
-  const [show2faModal, setShow2faModal] = useState<'enable' | 'disable' | null>(null);
 
-  // Change password form state.
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -36,7 +30,7 @@ export const AccountSecurity = () => {
   const submitChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     setPwErr(null); setPwOk(false);
-    if (next.length < 8) { setPwErr('New password must be at least 8 characters.'); return; }
+    if (!isPasswordValid(next)) { setPwErr('Password does not meet the policy below.'); return; }
     if (next !== confirm) { setPwErr('Passwords don\'t match.'); return; }
     setPwBusy(true);
     try {
@@ -49,15 +43,6 @@ export const AccountSecurity = () => {
     } finally {
       setPwBusy(false);
     }
-  };
-
-  const submit2faToggle = async (password: string) => {
-    if (show2faModal === 'enable') {
-      await enableTwoFactorApi(password);
-    } else if (show2faModal === 'disable') {
-      await disableTwoFactorApi(password);
-    }
-    await refresh();
   };
 
   const home = user ? HOMES[user.role] : '/login';
@@ -80,69 +65,60 @@ export const AccountSecurity = () => {
             <div className="text-xs uppercase tracking-wider text-brand-green-dark font-semibold">Account</div>
             <h1 className="text-3xl font-extrabold text-brand-navy mt-1">Security</h1>
             <p className="text-slate-600 text-sm mt-2">
-              Manage two-factor authentication and your password. Signed in as{' '}
-              <strong className="text-brand-navy">{user?.email}</strong>.
+              Signed in as <strong className="text-brand-navy">{user?.email}</strong>.
             </p>
           </div>
 
-          {/* 2FA card */}
-          <section className="card p-6">
-            <div className="flex items-start justify-between gap-4">
+          {/* 2FA info card — always on, no toggle. */}
+          <section className="card p-6 border-l-4 border-brand-green bg-green-50/40">
+            <div className="flex items-start gap-3">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#15803d"
+                   strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                   className="mt-0.5 shrink-0">
+                <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
               <div>
-                <div className="font-bold text-brand-navy">Two-factor authentication</div>
-                <p className="text-sm text-slate-600 mt-1 max-w-lg">
-                  When enabled, you'll receive a 6-digit code by email each time you sign in. This protects your account if your password is ever exposed.
+                <div className="font-bold text-brand-navy">Two-factor authentication is on</div>
+                <p className="text-sm text-slate-700 mt-1">
+                  Each time you sign in we email a 6-digit code to{' '}
+                  <strong className="text-brand-navy">{user?.email}</strong>. You'll need to enter that code
+                  after your password to finish signing in. This protects your NCLMS account even if your
+                  password leaks somewhere else.
                 </p>
-                <div className="mt-3">
-                  {user?.two_factor_enabled
-                    ? <span className="badge-approved">Enabled</span>
-                    : <span className="badge-pending">Disabled</span>}
-                </div>
               </div>
-              {user?.two_factor_enabled
-                ? <button onClick={() => setShow2faModal('disable')} className="btn-outline border-red-300 text-red-700 hover:bg-red-50 shrink-0">Disable</button>
-                : <button onClick={() => setShow2faModal('enable')} className="btn-primary shrink-0">Enable</button>
-              }
             </div>
           </section>
 
           {/* Change password */}
           <section className="card p-6">
             <div className="font-bold text-brand-navy">Change password</div>
-            <p className="text-sm text-slate-600 mt-1">Pick something at least 8 characters long. You'll stay signed in after the change.</p>
+            <p className="text-sm text-slate-600 mt-1">Pick a strong password. The checklist below updates as you type.</p>
             <form className="mt-5 space-y-4" onSubmit={submitChangePassword}>
-              <TextField label="Current password" type="password" required value={current}
-                onChange={(e) => setCurrent(e.target.value)} name="current" />
-              <TextField label="New password" type="password" required value={next}
-                onChange={(e) => setNext(e.target.value)} name="next" />
-              <TextField label="Confirm new password" type="password" required value={confirm}
-                onChange={(e) => setConfirm(e.target.value)} name="confirm" />
+              <TextField label="Current password" type="password" required autoComplete="current-password"
+                value={current} onChange={(e) => setCurrent(e.target.value)} name="current" />
+              <div>
+                <TextField label="New password" type="password" required autoComplete="new-password"
+                  value={next} onChange={(e) => setNext(e.target.value)} name="next" />
+                <PasswordStrength password={next} />
+              </div>
+              <TextField label="Confirm new password" type="password" required autoComplete="new-password"
+                value={confirm} onChange={(e) => setConfirm(e.target.value)} name="confirm"
+                error={confirm.length > 0 && confirm !== next ? 'Passwords don\'t match' : undefined} />
               {pwErr && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{pwErr}</div>}
               {pwOk && <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">Password updated.</div>}
               <div className="flex justify-end">
-                <button className="btn-primary" disabled={pwBusy}>{pwBusy ? 'Updating…' : 'Update password'}</button>
+                <button
+                  className="btn-primary"
+                  disabled={pwBusy || !isPasswordValid(next) || next !== confirm || current.length === 0}
+                >
+                  {pwBusy ? 'Updating…' : 'Update password'}
+                </button>
               </div>
             </form>
           </section>
         </div>
       </main>
-
-      <PromptModal
-        open={show2faModal !== null}
-        title={show2faModal === 'enable' ? 'Enable two-factor authentication' : 'Disable two-factor authentication'}
-        description={
-          show2faModal === 'enable'
-            ? 'Confirm your current password. From your next sign-in we\'ll email you a 6-digit code to enter after your password.'
-            : 'Confirm your current password to turn off 2FA. Your account will be less protected.'
-        }
-        label="Current password"
-        placeholder="Your current password"
-        required
-        confirmLabel={show2faModal === 'enable' ? 'Enable 2FA' : 'Disable 2FA'}
-        variant={show2faModal === 'disable' ? 'danger' : 'default'}
-        onClose={() => setShow2faModal(null)}
-        onSubmit={submit2faToggle}
-      />
     </div>
   );
 };

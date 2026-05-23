@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { resetPassword } from '../api/auth';
 import { TextField } from '../components/Field';
+import { PasswordStrength, isPasswordValid } from '../components/PasswordStrength';
 import type { ApiError } from '../api/client';
 
 export const ResetPassword = () => {
@@ -17,7 +18,7 @@ export const ResetPassword = () => {
     e.preventDefault();
     setErr(null);
     if (!token) { setErr('Reset link is invalid.'); return; }
-    if (next.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+    if (!isPasswordValid(next)) { setErr('Password does not meet the policy below.'); return; }
     if (next !== confirm) { setErr('Passwords don\'t match.'); return; }
     setBusy(true);
     try {
@@ -35,7 +36,7 @@ export const ResetPassword = () => {
     <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
       <h1 className="text-3xl font-extrabold text-brand-navy">Set a new password</h1>
       <p className="text-slate-600 mt-2 text-sm">
-        Choose a strong password. Min 8 characters. You'll be able to sign in straight away.
+        Choose a strong password — the checklist below shows the policy. You'll be able to sign in straight away.
       </p>
 
       {done ? (
@@ -45,12 +46,16 @@ export const ResetPassword = () => {
         </div>
       ) : (
         <form className="card p-7 mt-8 space-y-5" onSubmit={submit}>
-          <TextField label="New password" type="password" required autoFocus value={next}
-            onChange={(e) => setNext(e.target.value)} name="next" />
-          <TextField label="Confirm password" type="password" required value={confirm}
-            onChange={(e) => setConfirm(e.target.value)} name="confirm" />
+          <div>
+            <TextField label="New password" type="password" required autoFocus autoComplete="new-password"
+              value={next} onChange={(e) => setNext(e.target.value)} name="next" />
+            <PasswordStrength password={next} />
+          </div>
+          <TextField label="Confirm password" type="password" required autoComplete="new-password"
+            value={confirm} onChange={(e) => setConfirm(e.target.value)} name="confirm"
+            error={confirm.length > 0 && confirm !== next ? 'Passwords don\'t match' : undefined} />
           {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
-          <button className="btn-primary w-full" disabled={busy}>
+          <button className="btn-primary w-full" disabled={busy || !isPasswordValid(next) || next !== confirm}>
             {busy ? 'Updating…' : 'Set new password'}
           </button>
           <div className="text-sm text-center">

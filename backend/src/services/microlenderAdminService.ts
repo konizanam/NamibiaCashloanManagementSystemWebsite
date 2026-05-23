@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { pool, withTransaction } from '../db.js';
 import { conflict, notFound } from '../lib/errors.js';
+import { enforcePasswordPolicy } from '../lib/passwordPolicy.js';
 
 export interface MicrolenderListRow {
   id: string;
@@ -121,6 +122,7 @@ export interface CreateMicrolenderInput {
 }
 
 export async function createMicrolender(input: CreateMicrolenderInput): Promise<MicrolenderDetailRow> {
+  enforcePasswordPolicy(input.password);
   const email = input.business_email.toLowerCase();
 
   // Uniqueness: NAMFISA reg no across both applications and existing microlenders.
