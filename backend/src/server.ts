@@ -72,9 +72,10 @@ app.use('/api/microlenders', microlendersRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const server = app.listen(config.port, () => {
-  console.log(`NCLMS API listening on http://localhost:${config.port} (${config.env})`);
-  console.log(`Scalar docs:  http://localhost:${config.port}/docs`);
+const HOST = '0.0.0.0';
+const server = app.listen(config.port, HOST, () => {
+  console.log(`NCLMS API listening on ${HOST}:${config.port} (${config.env})`);
+  console.log(`Scalar docs:  http://${HOST}:${config.port}/docs`);
   startReminderJob();
 });
 
