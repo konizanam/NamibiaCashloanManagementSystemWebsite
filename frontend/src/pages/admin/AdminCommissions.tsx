@@ -6,8 +6,9 @@ import {
   markPaidWithProof,
 } from '../../api/commissions';
 import { getToken } from '../../api/client';
+import { listAgents } from '../../api/marketingAgents';
 import { PromptModal } from '../../components/PromptModal';
-import type { Commission, CommissionStatus, CommissionType, Paginated } from '../../api/types';
+import type { Commission, CommissionStatus, CommissionType, MarketingAgent, Paginated } from '../../api/types';
 
 const fmtNAD = (n: number | string) =>
   new Intl.NumberFormat('en-NA', { style: 'currency', currency: 'NAD' }).format(Number(n));
@@ -133,6 +134,8 @@ export const AdminCommissions = () => {
   const [status, setStatus] = useState<CommissionStatus | ''>('');
   const [type, setType] = useState<CommissionType | ''>('');
   const [period, setPeriod] = useState<string>('');
+  const [agentId, setAgentId] = useState<string>('');
+  const [agents, setAgents] = useState<MarketingAgent[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
   const [genErr, setGenErr] = useState<string | null>(null);
@@ -148,12 +151,18 @@ export const AdminCommissions = () => {
       status: status || undefined,
       type: type || undefined,
       period_month: period || undefined,
+      agent_id: agentId || undefined,
       limit: 100,
     })
       .then(setData)
       .finally(() => setLoading(false));
   };
-  useEffect(load, [status, type, period]);
+  useEffect(load, [status, type, period, agentId]);
+
+  // Agents list for the filter dropdown.
+  useEffect(() => {
+    listAgents().then((r) => setAgents(r.items)).catch(() => undefined);
+  }, []);
 
   const runGenerate = async () => {
     setGenBusy(true);
@@ -201,6 +210,17 @@ export const AdminCommissions = () => {
       </div>
 
       <div className="card p-4 mt-4 flex flex-wrap gap-3 items-end">
+        <div className="min-w-[200px] flex-1">
+          <label className="field-label">Agent</label>
+          <select className="field-input" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+            <option value="">All agents</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.full_name} ({a.referral_code})
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="field-label">Status</label>
           <select className="field-input" value={status} onChange={(e) => setStatus(e.target.value as CommissionStatus | '')}>
@@ -221,6 +241,14 @@ export const AdminCommissions = () => {
             {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </div>
+        {(agentId || status || type || period) && (
+          <button
+            className="btn-outline"
+            onClick={() => { setAgentId(''); setStatus(''); setType(''); setPeriod(''); }}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className="card mt-4 overflow-hidden">
