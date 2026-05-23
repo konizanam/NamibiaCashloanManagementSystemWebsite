@@ -1,0 +1,10 @@
+{
+  "name": "nclms",
+  "private": true,
+  "version": "0.0.0",
+  "description": "NCLMS — Namibia Cash Loan Management System (monorepo root).",
+  "scripts": {
+    "build": "cd backend && npm ci && npm run build",
+    "start": "cd backend && node dist/migrate.js && node dist/server.js"
+  }
+}

@@ -1,0 +1,13 @@
+# Railway build + deploy at the repo root so Railpack can find a package.json.
+# The root package.json's build/start scripts delegate into ./backend.
+
+[build]
+builder = "RAILPACK"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
