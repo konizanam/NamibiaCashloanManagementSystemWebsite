@@ -67,6 +67,19 @@ async function issueOtp(userId: string, email: string, fullName: string): Promis
       WHERE id = $1`,
     [userId, hash],
   );
+
+  // In non-production environments, surface the code in the backend console so
+  // you can test 2FA locally without needing a deliverable email address.
+  if (config.env !== 'production') {
+    console.log(
+      `\n┌─ [2FA] dev-only — DO NOT log this in production ───────────\n` +
+      `│  user  : ${email}\n` +
+      `│  code  : ${code}\n` +
+      `│  expires in ${OTP_TTL_MIN} minutes\n` +
+      `└────────────────────────────────────────────────────────────\n`,
+    );
+  }
+
   await sendTwoFactorCodeEmail({ email, fullName, code, ttlMinutes: OTP_TTL_MIN });
 }
 
