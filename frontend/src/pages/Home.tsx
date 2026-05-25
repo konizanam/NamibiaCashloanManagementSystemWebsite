@@ -76,8 +76,20 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Apply CTA */}
+      {/* Product preview */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+        <div className="rounded-2xl overflow-hidden shadow-cardHover ring-1 ring-slate-200 bg-white">
+          <img
+            src="/nclms-website-picture.png"
+            alt="NCLMS admin dashboard preview"
+            className="block w-full h-auto"
+            loading="lazy"
+          />
+        </div>
+      </section>
+
+      {/* Apply CTA */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
         <div className="rounded-2xl bg-brand-navy text-white p-10 md:p-14 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h2 className="text-3xl md:text-4xl font-extrabold">Ready to onboard your microlending business?</h2>
