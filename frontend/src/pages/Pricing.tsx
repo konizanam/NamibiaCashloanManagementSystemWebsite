@@ -104,7 +104,7 @@ export const Pricing = () => {
     canonicalPath: '/pricing',
   });
   return (
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     {/* Header */}
     <div className="text-center">
       <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Pricing</div>
@@ -116,7 +116,7 @@ export const Pricing = () => {
     </div>
 
     {/* Tier cards */}
-    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
+    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">
       {tiers.map((t) => (
         <div
           key={t.name}
@@ -160,7 +160,7 @@ export const Pricing = () => {
     </div>
 
     {/* What every plan includes */}
-    <section className="mt-16">
+    <section className="mt-8">
       <div className="text-center">
         <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Included in every plan</div>
         <h2 className="text-2xl font-extrabold text-brand-navy mt-2">No matter which tier you choose</h2>
@@ -182,7 +182,7 @@ export const Pricing = () => {
     </section>
 
     {/* Onboarding includes */}
-    <section className="mt-16 card p-8 bg-gradient-to-br from-slate-50 to-green-50/60">
+    <section className="mt-8 card p-8 bg-gradient-to-br from-slate-50 to-green-50/60">
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">What onboarding includes</div>
@@ -203,7 +203,7 @@ export const Pricing = () => {
     </section>
 
     {/* Optional add-on + custom enhancements */}
-    <div className="grid md:grid-cols-2 gap-6 mt-12">
+    <div className="grid md:grid-cols-2 gap-6 mt-6">
       <div className="card p-6">
         <div className="text-xs font-bold uppercase tracking-wider text-brand-amber mb-1">Optional hardware</div>
         <div className="font-bold text-brand-navy text-lg">Signature pad for walk-in clients</div>
@@ -251,7 +251,7 @@ export const Pricing = () => {
     </section>
 
     {/* Billing / compliance footer */}
-    <section className="mt-12 grid md:grid-cols-3 gap-4">
+    <section className="mt-6 grid md:grid-cols-3 gap-4">
       <div className="card p-5">
         <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Billing</div>
         <ul className="mt-2 text-sm text-slate-700 space-y-1">

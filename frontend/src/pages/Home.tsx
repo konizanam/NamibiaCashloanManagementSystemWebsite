@@ -54,7 +54,7 @@ export const Home = () => {
       </section>
 
       {/* Mission */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="rounded-2xl bg-gradient-to-r from-slate-50 to-green-50 p-6 md:p-8 grid md:grid-cols-2 gap-8 md:gap-10 items-center">
           <div>
             <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Why NCLMS</div>
@@ -89,7 +89,7 @@ export const Home = () => {
       </section>
 
       {/* Apply CTA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="rounded-2xl bg-brand-navy text-white p-10 md:p-14 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h2 className="text-3xl md:text-4xl font-extrabold">Ready to onboard your microlending business?</h2>

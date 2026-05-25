@@ -7,14 +7,14 @@ export const Contact = () => {
     canonicalPath: '/contact',
   });
   return (
-  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Contact</div>
     <h1 className="text-4xl font-extrabold text-brand-navy mt-2">Get in touch with Koniza.</h1>
     <p className="mt-3 text-slate-600">
       Talk to us about onboarding, tier selection, or a custom enhancement. We respond within one business day.
     </p>
 
-    <div className="grid md:grid-cols-2 gap-6 mt-10">
+    <div className="grid md:grid-cols-2 gap-6 mt-6">
       <div className="card p-7">
         <div className="font-bold text-brand-navy">Office</div>
         <div className="text-slate-700 mt-2">
@@ -32,7 +32,7 @@ export const Contact = () => {
       </div>
     </div>
 
-    <div className="mt-10 card p-7 border-l-4 border-brand-green bg-green-50/40">
+    <div className="mt-6 card p-7 border-l-4 border-brand-green bg-green-50/40">
       <div className="font-bold text-brand-navy">Ready to apply?</div>
       <p className="text-sm text-slate-700 mt-1">
         If you want to onboard your microlending business directly, you can submit your application online — it takes a few minutes.

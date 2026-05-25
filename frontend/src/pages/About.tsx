@@ -7,7 +7,7 @@ export const About = () => {
     canonicalPath: '/about',
   });
   return (
-  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">About NCLMS</div>
     <h1 className="text-4xl font-extrabold text-brand-navy mt-2">Built for Namibian microlenders.</h1>
     <p className="mt-4 text-slate-600 leading-relaxed text-lg">
@@ -15,7 +15,7 @@ export const About = () => {
       compliant, efficient, and audit-ready operations — without expensive infrastructure or in-house IT.
     </p>
 
-    <div className="grid md:grid-cols-2 gap-8 mt-12">
+    <div className="grid md:grid-cols-2 gap-8 mt-6">
       <div className="card p-7">
         <div className="text-brand-green-dark font-semibold text-sm uppercase tracking-wider">Vision</div>
         <p className="mt-2 text-slate-700 leading-relaxed">
@@ -36,7 +36,7 @@ export const About = () => {
       </div>
     </div>
 
-    <div className="mt-12 card p-7 border-l-4 border-brand-amber bg-amber-50/40">
+    <div className="mt-6 card p-7 border-l-4 border-brand-amber bg-amber-50/40">
       <div className="font-semibold text-brand-navy">Compliance scope</div>
       <p className="mt-1 text-sm text-slate-700">
         NCLMS provides NAMFISA-aligned loan reporting only. It does not replace accounting, tax, or legal services.
