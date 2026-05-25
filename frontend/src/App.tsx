@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PublicLayout } from './components/Layout';
+import { ScrollToTop } from './components/ScrollToTop';
+import { BackToTop } from './components/BackToTop';
 import { Home } from './pages/Home';
 import { About } from './pages/About';
 import { Features } from './pages/Features';
@@ -64,6 +66,9 @@ const RequireAnyAuth = ({ children }: { children: ReactNode }) => {
 
 export default function App() {
   return (
+    <>
+    <ScrollToTop />
+    <BackToTop />
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
@@ -130,5 +135,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 }

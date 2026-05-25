@@ -55,7 +55,7 @@ export const Home = () => {
 
       {/* Mission */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
-        <div className="rounded-2xl bg-gradient-to-r from-slate-50 to-green-50 p-8 md:p-12 grid md:grid-cols-2 gap-10">
+        <div className="rounded-2xl bg-gradient-to-r from-slate-50 to-green-50 p-6 md:p-8 grid md:grid-cols-2 gap-8 md:gap-10 items-center">
           <div>
             <div className="text-brand-green-dark font-semibold uppercase tracking-wider text-xs">Why NCLMS</div>
             <h2 className="text-3xl font-extrabold mt-2 text-brand-navy">Move from manual chaos to digital control.</h2>
@@ -77,7 +77,7 @@ export const Home = () => {
       </section>
 
       {/* Product preview */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3">
         <div className="rounded-2xl overflow-hidden shadow-cardHover ring-1 ring-slate-200 bg-white">
           <img
             src="/nclms-website-picture.png"
