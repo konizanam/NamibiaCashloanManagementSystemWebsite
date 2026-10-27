@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, conflict, notFound } from '../lib/errors.js';
 
 export interface DemoAccount {
   id: number;
@@ -20,7 +20,21 @@ export interface DemoAccountList {
   environment: string;
   resetIntervalHours: number;
   total: number;
+  limit: number;
+  offset: number;
+  summary: { all: number; verified: number; unverified: number };
   items: DemoAccount[];
+}
+
+export interface ListDemoAccountsQuery {
+  q?: string;
+  verified?: 'true' | 'false';
+  loggedIn?: 'true' | 'false';
+  from?: string;
+  to?: string;
+  sort?: 'newest' | 'oldest' | 'last_login' | 'company';
+  limit: number;
+  offset: number;
 }
 
 const upstreamError = (message: string): HttpError => new HttpError(502, 'cms_unavailable', message);
@@ -37,16 +51,12 @@ const requireCmsConfig = () => {
   return { apiUrl, username, password };
 };
 
-export const listDemoAccounts = async (opts: { q?: string; status?: string }): Promise<DemoAccountList> => {
+const cmsFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const { apiUrl, username, password } = requireCmsConfig();
-  const qs = new URLSearchParams();
-  if (opts.q) qs.set('q', opts.q);
-  if (opts.status) qs.set('status', opts.status);
-  const url = `${apiUrl}/api/tenants${qs.size ? `?${qs.toString()}` : ''}`;
-
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetch(`${apiUrl}${path}`, {
+      ...init,
       headers: {
         Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
         Accept: 'application/json',
@@ -62,8 +72,36 @@ export const listDemoAccounts = async (opts: { q?: string; status?: string }): P
   if (res.status === 503) {
     throw upstreamError('Tenant listing is not configured on the Cash Loan Management System API (TENANTS_API_USERNAME / TENANTS_API_PASSWORD).');
   }
+  return res;
+};
+
+const upstreamMessage = async (res: Response, fallback: string): Promise<string> => {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    return typeof body.error === 'string' ? body.error : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+export const listDemoAccounts = async (opts: ListDemoAccountsQuery): Promise<DemoAccountList> => {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(opts)) {
+    if (value !== undefined && value !== '') qs.set(key, String(value));
+  }
+  const res = await cmsFetch(`/api/tenants?${qs.toString()}`);
   if (!res.ok) {
     throw upstreamError(`Cash Loan Management System API returned ${res.status} for the demo account list.`);
   }
   return (await res.json()) as DemoAccountList;
+};
+
+export const resendDemoActivation = async (id: number): Promise<{ email: string; message: string }> => {
+  const res = await cmsFetch(`/api/tenants/${id}/resend-verification`, { method: 'POST' });
+  if (res.status === 404) throw notFound(await upstreamMessage(res, 'Demo account not found.'));
+  if (res.status === 409) throw conflict(await upstreamMessage(res, 'This account is already verified.'));
+  if (!res.ok) {
+    throw upstreamError(await upstreamMessage(res, `Cash Loan Management System API returned ${res.status}.`));
+  }
+  return (await res.json()) as { email: string; message: string };
 };
