@@ -26,74 +26,41 @@ export interface DemoAccountList {
 const upstreamError = (message: string): HttpError => new HttpError(502, 'cms_unavailable', message);
 
 const requireCmsConfig = () => {
-  const { apiUrl, clientId, clientSecret } = config.cms;
-  if (!apiUrl || !clientId || !clientSecret) {
+  const { apiUrl, username, password } = config.cms;
+  if (!apiUrl || !username || !password) {
     throw new HttpError(
       503,
       'cms_not_configured',
-      'The Cash Loan Management System API is not configured (CMS_API_URL, CMS_CLIENT_ID, CMS_CLIENT_SECRET).',
+      'The Cash Loan Management System API is not configured (CMS_API_URL, CMS_API_USERNAME, CMS_API_PASSWORD).',
     );
   }
-  return { apiUrl, clientId, clientSecret };
-};
-
-// Client-credentials token, reused until a minute before it expires.
-let cachedToken: { value: string; expiresAt: number } | null = null;
-
-const getAccessToken = async (): Promise<string> => {
-  if (cachedToken && Date.now() < cachedToken.expiresAt) return cachedToken.value;
-
-  const { apiUrl, clientId, clientSecret } = requireCmsConfig();
-  let res: Response;
-  try {
-    res = await fetch(`${apiUrl}/api/integration/auth/token`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
-      body: new URLSearchParams({ grant_type: 'client_credentials' }).toString(),
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    throw upstreamError('Could not reach the Cash Loan Management System API.');
-  }
-  if (!res.ok) {
-    throw upstreamError(`Cash Loan Management System API rejected the client credentials (${res.status}).`);
-  }
-  const body = (await res.json()) as { access_token?: string; expires_in?: number };
-  if (!body.access_token) throw upstreamError('Cash Loan Management System API returned no access token.');
-
-  const ttlMs = Math.max(60, body.expires_in ?? 3600) * 1000;
-  cachedToken = { value: body.access_token, expiresAt: Date.now() + ttlMs - 60_000 };
-  return body.access_token;
+  return { apiUrl, username, password };
 };
 
 export const listDemoAccounts = async (opts: { q?: string; status?: string }): Promise<DemoAccountList> => {
-  const { apiUrl } = requireCmsConfig();
+  const { apiUrl, username, password } = requireCmsConfig();
   const qs = new URLSearchParams();
   if (opts.q) qs.set('q', opts.q);
   if (opts.status) qs.set('status', opts.status);
   const url = `${apiUrl}/api/tenants${qs.size ? `?${qs.toString()}` : ''}`;
 
-  const call = async (): Promise<Response> => {
-    try {
-      return await fetch(url, {
-        headers: { Authorization: `Bearer ${await getAccessToken()}`, Accept: 'application/json' },
-        signal: AbortSignal.timeout(15_000),
-      });
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      throw upstreamError('Could not reach the Cash Loan Management System API.');
-    }
-  };
-
-  let res = await call();
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw upstreamError('Could not reach the Cash Loan Management System API.');
+  }
   if (res.status === 401) {
-    // Token revoked or secret rotated upstream: fetch a fresh one once.
-    cachedToken = null;
-    res = await call();
+    throw upstreamError('Cash Loan Management System API rejected CMS_API_USERNAME / CMS_API_PASSWORD.');
+  }
+  if (res.status === 503) {
+    throw upstreamError('Tenant listing is not configured on the Cash Loan Management System API (TENANTS_API_USERNAME / TENANTS_API_PASSWORD).');
   }
   if (!res.ok) {
     throw upstreamError(`Cash Loan Management System API returned ${res.status} for the demo account list.`);

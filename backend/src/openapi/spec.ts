@@ -520,7 +520,7 @@ export const openapiSpec = {
       get: {
         tags: ['Admin Demo Accounts'],
         summary: 'List demo accounts (admin)',
-        description: 'Proxies GET /api/tenants on the Cash Loan Management System API using client credentials (CMS_CLIENT_ID / CMS_CLIENT_SECRET).',
+        description: 'Proxies GET /api/tenants on the Cash Loan Management System API using HTTP Basic auth (CMS_API_USERNAME / CMS_API_PASSWORD).',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'q',      in: 'query', schema: { type: 'string' }, description: 'Company name, slug or owner email' },
