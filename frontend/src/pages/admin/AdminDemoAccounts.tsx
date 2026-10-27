@@ -33,6 +33,11 @@ const PAGE_SIZES = [10, 25, 50, 100];
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
 
+const formatInterval = (hours: number) =>
+  hours % 24 === 0
+    ? `${hours / 24} day${hours === 24 ? '' : 's'}`
+    : `${hours} hour${hours === 1 ? '' : 's'}`;
+
 export const AdminDemoAccounts = () => {
   const [data, setData] = useState<DemoAccountList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +112,7 @@ export const AdminDemoAccounts = () => {
           <h1 className="text-2xl font-extrabold text-brand-navy">Demo Accounts</h1>
           <p className="text-slate-600 text-sm mt-1">
             Companies self-registered on the Cash Loan Management System demo.
-            {data && <> Data resets every {data.resetIntervalHours}h · environment <span className="font-mono">{data.environment}</span>.</>}
+            {data && <> Data resets every {formatInterval(data.resetIntervalHours)} · environment <span className="font-mono">{data.environment}</span>.</>}
           </p>
         </div>
         <button className="btn-outline w-full sm:w-auto" onClick={load} disabled={loading}>Refresh</button>
