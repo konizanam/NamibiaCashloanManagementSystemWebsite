@@ -43,6 +43,14 @@ export const config = {
   },
 
   maxUploadSize: num(process.env.MAX_UPLOAD_SIZE, 10 * 1024 * 1024),
+
+  // Cash Loan Management System API (demo tenants). Optional: the admin
+  // Demo Accounts page reports "not configured" until all three are set.
+  cms: {
+    apiUrl: process.env.CMS_API_URL?.replace(/\/+$/, ''),
+    clientId: process.env.CMS_CLIENT_ID,
+    clientSecret: process.env.CMS_CLIENT_SECRET,
+  },
 } as const;
 
 export type AppConfig = typeof config;

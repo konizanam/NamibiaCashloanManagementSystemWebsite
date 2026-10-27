@@ -17,6 +17,7 @@ import { commissionsRouter } from './routes/commissions.js';
 import { resubmitRouter } from './routes/resubmit.js';
 import { microlenderRouter } from './routes/microlender.js';
 import { microlendersRouter } from './routes/microlenders.js';
+import { demoAccountsRouter } from './routes/demoAccounts.js';
 import { startReminderJob } from './services/reminderService.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { openapiSpec } from './openapi/spec.js';
@@ -69,6 +70,7 @@ app.use('/api/admin/commissions', commissionsRouter);
 app.use('/api/applications/resubmit', resubmitRouter);
 app.use('/api/microlender', microlenderRouter);
 app.use('/api/microlenders', microlendersRouter);
+app.use('/api/admin/demo-accounts', demoAccountsRouter);
 
 // ---------------------------------------------------------------------------
 // Serve the built React frontend (Vite's `frontend/dist` output) so the

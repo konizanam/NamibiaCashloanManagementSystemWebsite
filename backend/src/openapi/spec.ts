@@ -27,6 +27,7 @@ export const openapiSpec = {
     { name: 'Application Messages', description: 'Admin notes/messages to applicants' },
     { name: 'Microlender', description: 'Microlender self-service' },
     { name: 'Admin Microlenders', description: 'Admin-side CRUD for tenant microlenders' },
+    { name: 'Admin Demo Accounts', description: 'Self-registered demo companies, read from the Cash Loan Management System API' },
   ],
   components: {
     securitySchemes: {
@@ -513,6 +514,23 @@ export const openapiSpec = {
           },
         },
         responses: { '200': { description: 'Updated' }, '409': { description: 'Conflict / not editable' } },
+      },
+    },
+    '/api/admin/demo-accounts': {
+      get: {
+        tags: ['Admin Demo Accounts'],
+        summary: 'List demo accounts (admin)',
+        description: 'Proxies GET /api/tenants on the Cash Loan Management System API using client credentials (CMS_CLIENT_ID / CMS_CLIENT_SECRET).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'q',      in: 'query', schema: { type: 'string' }, description: 'Company name, slug or owner email' },
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Demo accounts with verification state and next reset' },
+          '502': { description: 'CMS API unreachable or rejected the request' },
+          '503': { description: 'CMS API not configured' },
+        },
       },
     },
     '/api/microlenders': {

@@ -9,6 +9,7 @@ const SIDE = [
   { to: '/admin/microlenders',     label: 'Microlenders' },
   { to: '/admin/marketing-agents', label: 'Marketing Agents' },
   { to: '/admin/commissions',      label: 'Commissions' },
+  { to: '/admin/demo-accounts',    label: 'Demo Accounts' },
 ];
 
 export const AdminLayout = () => {

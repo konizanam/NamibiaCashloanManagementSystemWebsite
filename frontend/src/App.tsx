@@ -24,6 +24,7 @@ import { AdminMarketingAgents } from './pages/admin/AdminMarketingAgents';
 import { AdminCommissions } from './pages/admin/AdminCommissions';
 import { AdminMicrolenders } from './pages/admin/AdminMicrolenders';
 import { AdminMicrolenderDetail } from './pages/admin/AdminMicrolenderDetail';
+import { AdminDemoAccounts } from './pages/admin/AdminDemoAccounts';
 import { AgentLayout } from './pages/agent/AgentLayout';
 import { AgentDashboard } from './pages/agent/AgentDashboard';
 import { AgentCommissions } from './pages/agent/AgentCommissions';
@@ -105,6 +106,7 @@ export default function App() {
         <Route path="commissions" element={<AdminCommissions />} />
         <Route path="microlenders" element={<AdminMicrolenders />} />
         <Route path="microlenders/:id" element={<AdminMicrolenderDetail />} />
+        <Route path="demo-accounts" element={<AdminDemoAccounts />} />
       </Route>
 
       <Route
